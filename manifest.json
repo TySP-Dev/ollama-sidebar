@@ -3,7 +3,8 @@
   "name": "Ollama Sidebar",
   "version": "1.0.0",
   "description": "Chat with local Ollama models from a browser sidebar",
-  "permissions": ["storage", "sidePanel", "tabs", "activeTab", "scripting"],
+  "options_page": "settings.html",
+  "permissions": ["storage", "sidePanel", "tabs", "activeTab"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
@@ -33,7 +34,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["marked.min.js", "highlight.min.js", "marked.min.css"],
+      "resources": ["marked.min.js", "highlight.min.js", "hljs-github-dark.min.css", "pdf.min.js", "pdf.worker.min.js"],
       "matches": ["<all_urls>"]
     }
   ],

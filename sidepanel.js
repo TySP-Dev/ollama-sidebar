@@ -13,35 +13,152 @@ var DEF_PARAMS = {
   num_predict:    -1
 };
 
-var DEFAULT_SYSTEM_PROMPT = 'You are a helpful AI assistant.';
+var DEFAULT_TEMPLATES = [
+  {
+    id: '__builtin_explain', builtin: true,
+    name: 'Explain this',
+    content: 'Explain the following clearly, using analogies if helpful:\n\n'
+  },
+  {
+    id: '__builtin_summarize', builtin: true,
+    name: 'Summarize',
+    content: 'Summarize the following. Lead with the single most important point, then cover key supporting details in bullet points:\n\n'
+  },
+  {
+    id: '__builtin_fix_code', builtin: true,
+    name: 'Fix this code',
+    content: 'Find and fix any bugs in the following code. List what was wrong and why, then show the corrected version:\n\n```\n\n```'
+  },
+  {
+    id: '__builtin_debug', builtin: true,
+    name: 'Debug help',
+    content: "I'm getting this error:\n\n```\n\n```\n\nHere's the relevant code:\n\n```\n\n```\n\nWhat's causing it and how do I fix it?"
+  },
+  {
+    id: '__builtin_review', builtin: true,
+    name: 'Review & improve',
+    content: 'Review the following and give specific, actionable feedback. Focus on clarity, correctness, and anything that could be stronger:\n\n'
+  },
+  {
+    id: '__builtin_write_tests', builtin: true,
+    name: 'Write tests',
+    content: 'Write comprehensive unit tests for the following code. Cover happy paths, edge cases, and error conditions:\n\n```\n\n```'
+  },
+  {
+    id: '__builtin_pros_cons', builtin: true,
+    name: 'Pros & cons',
+    content: 'List the pros and cons of the following. Be balanced and specific:\n\n'
+  },
+  {
+    id: '__builtin_eli5', builtin: true,
+    name: 'ELI5',
+    content: 'Explain this like I\'m five years old, using only simple words and a concrete analogy:\n\n'
+  },
+  {
+    id: '__builtin_regex', builtin: true,
+    name: 'Write a regex',
+    content: 'Write a regex pattern that matches the following. Explain each part of the pattern and provide test cases:\n\n'
+  },
+  {
+    id: '__builtin_translate', builtin: true,
+    name: 'Translate',
+    content: 'Translate the following to [language]. Preserve tone and meaning as closely as possible:\n\n'
+  }
+];
 
-var PARAM_META = [
-  { key: 'temperature',    label: 'Temperature',   min: 0,   max: 2,     step: 0.05 },
-  { key: 'top_p',          label: 'Top-P',         min: 0,   max: 1,     step: 0.05 },
-  { key: 'top_k',          label: 'Top-K',         min: 1,   max: 200,   step: 1    },
-  { key: 'repeat_penalty', label: 'Repeat penalty',min: 0.5, max: 2,     step: 0.05 },
-  { key: 'seed',           label: 'Seed (-1=rand)',min: -1,  max: 999999,step: 1    },
-  { key: 'num_ctx',        label: 'Context (tokens)',min:512,max:131072, step: 512  },
-  { key: 'num_predict',    label: 'Max tokens (-1=∞)',min:-1,max:8192,  step: 1    }
+var DEFAULT_PERSONAS = [
+  {
+    id: '__persona_default', builtin: true,
+    name: 'Assistant',
+    prompt: 'Be concise and detailed. Give the most information in the fewest words unless the topic requires a longer explanation.'
+  },
+  {
+    id: '__persona_code_reviewer', builtin: true,
+    name: 'Code Reviewer',
+    prompt: 'You are an expert code reviewer. Analyze code for bugs, security vulnerabilities, performance issues, and style problems. Be specific — reference line numbers or variable names, and always show a corrected example alongside your critique.'
+  },
+  {
+    id: '__persona_study_buddy', builtin: true,
+    name: 'Study Buddy',
+    prompt: 'You are a patient tutor. Explain concepts step by step using plain language and concrete analogies. After explaining, ask one follow-up question to check understanding. Never just give answers — guide the user to figure things out.'
+  },
+  {
+    id: '__persona_editor', builtin: true,
+    name: 'Writing Editor',
+    prompt: 'You are a professional editor. Prioritize clarity, conciseness, and flow. Give specific rewrites, not general advice. Preserve the author\'s voice. Point out the two or three most impactful changes first.'
+  },
+  {
+    id: '__persona_rubber_duck', builtin: true,
+    name: 'Rubber Duck',
+    prompt: 'Help the user think through their problem by asking clarifying questions. Do not jump to solutions. Reflect back what you hear, identify what is unclear or assumed, and guide them toward their own answer.'
+  },
+  {
+    id: '__persona_devil', builtin: true,
+    name: "Devil's Advocate",
+    prompt: 'Constructively challenge the user\'s ideas and assumptions. Identify weaknesses in their reasoning, overlooked risks, and alternative perspectives. Be direct and specific, not dismissive.'
+  },
+  {
+    id: '__persona_tech_writer', builtin: true,
+    name: 'Technical Writer',
+    prompt: 'Write clear, precise technical documentation. Use active voice. Define every acronym on first use. Structure content with headers, numbered steps for procedures, and code examples where relevant.'
+  },
+  {
+    id: '__persona_brief', builtin: true,
+    name: 'Be Brief (BLUF)',
+    prompt: 'Use BLUF format. Lead with the direct answer in one sentence. Follow with no more than 3 bullet points of essential context if needed. If the answer fits in one sentence, stop there. Do not restate the question, add pleasantries, or summarize at the end.'
+  }
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 var S = {
-  settings:      { url: 'http://localhost:11434', token: '' },
-  theme:         'dark',
-  models:        [],   // [{ name, paramSize, sizeLabel }]
-  modelParams:   {},   // { [modelName]: { ...params } }
-  templates:     [],   // [{ id, name, content }]
-  sessions:      [],   // [{ id, name, model, updatedAt }]  index only
-  activeSession: null, // full session object
-  pageContext:   null,
-  usePageContext: false,
-  attachments:   [],   // [{ name, content }]
-  isStreaming:   false,
-  currentStream: null  // { requestId, bubble, thinkBlock, thinkContent,
-                       //   mainContent, metrics, sources, msgIndex }
+  settings:            { url: 'http://localhost:11434', token: '' },
+  theme:               'dark',
+  models:              [],
+  storedParams:        {},
+  defaultModel:        '',
+  defaultSystemPrompt: '',
+  templates:           [],
+  personas:            [],
+  activePersonaId:     null,
+  sessions:            [],
+  activeSession:       null,
+  pageContext:         null,
+  usePageContext:      false,
+  attachments:         [],
+  isStreaming:         false,
+  currentStream:       null,
+  autoScroll:          true,
+  compact:             false,
+  compareMode:         false,
+  language:            '',
+  embedModel:          ''
 };
+
+var _ctrlLPending = false;
+var _ctrlLTimer   = null;
+
+// ── Debug logging ─────────────────────────────────────────────────────────────
+
+var DBG_KEY = 'ollama_debug_log';
+var DBG_MAX = 500;
+
+function dbg(type, msg, detail) {
+  var entry = {
+    ts:     Date.now(),
+    type:   type,
+    msg:    msg,
+    detail: detail !== undefined ? JSON.parse(JSON.stringify(detail)) : undefined
+  };
+  chrome.storage.local.get(DBG_KEY, function (r) {
+    var log = r[DBG_KEY] || [];
+    var cutoff = Date.now() - (30 * 60 * 1000);
+    log = log.filter(function (e) { return e.ts > cutoff; });
+    log.push(entry);
+    if (log.length > DBG_MAX) log.splice(0, log.length - DBG_MAX);
+    chrome.storage.local.set({ [DBG_KEY]: log });
+  });
+}
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
@@ -50,42 +167,23 @@ var statusDot       = document.getElementById('status-dot');
 var btnSessions     = document.getElementById('btn-sessions');
 var sessionsPanel   = document.getElementById('sessions-panel');
 var sessionsList    = document.getElementById('sessions-list');
+var sessionSearch   = document.getElementById('session-search');
 var btnNewSession   = document.getElementById('btn-new-session');
 var btnSettings     = document.getElementById('btn-settings');
-var settingsPanel   = document.getElementById('settings-panel');
-var inputUrl        = document.getElementById('input-url');
-var inputToken      = document.getElementById('input-token');
-var btnShowToken    = document.getElementById('btn-show-token');
-var btnSave         = document.getElementById('btn-save');
-var settingsStatus  = document.getElementById('settings-status');
-var btnTheme        = document.getElementById('btn-theme');
 var sessionNameEl   = document.getElementById('session-name-display');
-var btnRenameSession = document.getElementById('btn-rename-session');
 var btnExportSession = document.getElementById('btn-export-session');
 var btnDeleteSession = document.getElementById('btn-delete-session');
 var chatArea        = document.getElementById('chat-area');
 var messagesEl      = document.getElementById('messages');
-var systemPanel     = document.getElementById('system-prompt-panel');
-var inputSysPrompt  = document.getElementById('input-system-prompt');
-var btnToggleSystem = document.getElementById('btn-toggle-system');
-var btnCloseSystem  = document.getElementById('btn-close-system');
-var paramsPanel     = document.getElementById('params-panel');
-var paramsGrid      = document.getElementById('params-grid');
-var btnToggleParams = document.getElementById('btn-toggle-params');
-var btnCloseParams  = document.getElementById('btn-close-params');
 var fileChipsArea   = document.getElementById('file-chips-area');
 var fileChipsEl     = document.getElementById('file-chips');
 var btnPageContext  = document.getElementById('btn-page-context');
 var pageCtxLbl     = document.getElementById('page-ctx-lbl');
-var btnAttachFile  = document.getElementById('btn-attach-file');
 var btnTemplatesOpen = document.getElementById('btn-templates-open');
-var btnClear        = document.getElementById('btn-clear');
 var inputMessage    = document.getElementById('input-message');
 var templateDropdown = document.getElementById('template-dropdown');
 var tmplDdList      = document.getElementById('tmpl-dd-list');
 var btnTmplManageInline = document.getElementById('btn-tmpl-manage-inline');
-var selectModel     = document.getElementById('select-model');
-var btnStop         = document.getElementById('btn-stop');
 var btnSend         = document.getElementById('btn-send');
 var tmplOverlay     = document.getElementById('tmpl-overlay');
 var tmplList        = document.getElementById('tmpl-list');
@@ -93,7 +191,21 @@ var tmplNewName     = document.getElementById('tmpl-new-name');
 var tmplNewContent  = document.getElementById('tmpl-new-content');
 var btnTmplAdd      = document.getElementById('btn-tmpl-add');
 var btnTmplOverlayClose = document.getElementById('btn-tmpl-overlay-close');
-var fileInput       = document.getElementById('file-input');
+var modelSelect     = document.getElementById('model-select');
+var modelSelectB    = document.getElementById('model-select-b');
+var btnCompare      = document.getElementById('btn-compare');
+var personaOverlay  = document.getElementById('persona-overlay');
+var personaList     = document.getElementById('persona-list');
+var personaNewName  = document.getElementById('persona-new-name');
+var personaNewPrompt = document.getElementById('persona-new-prompt');
+var btnPersonaAdd   = document.getElementById('btn-persona-add');
+var btnPersonaOverlayClose = document.getElementById('btn-persona-overlay-close');
+var exportOverlay      = document.getElementById('export-overlay');
+var exportOverlayTitle = document.getElementById('export-overlay-title');
+var exportContent      = document.getElementById('export-content');
+var btnExportCopy      = document.getElementById('btn-export-copy');
+var btnExportClose     = document.getElementById('btn-export-close');
+var helpOverlay        = document.getElementById('help-overlay');
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -143,191 +255,439 @@ function setStatus(state, title) {
   statusDot.title = title || state || 'Unknown';
 }
 
-function setSettingsStatus(msg, type) {
-  settingsStatus.textContent = msg;
-  settingsStatus.className = 'status-line' + (type ? ' ' + type : '');
-}
-
 function setSendEnabled(on) {
-  btnSend.disabled      = !on;
   inputMessage.disabled = !on;
   if (on) {
-    btnStop.classList.add('hidden');
-    btnSend.classList.remove('hidden');
+    btnSend.innerHTML   = '&#9658;';
+    btnSend.title       = 'Send (Enter)';
+    btnSend.classList.remove('streaming');
+    btnSend.onclick     = null;
+    dbg('CLICK', 'send button switched to send mode');
   } else {
-    btnStop.classList.remove('hidden');
-    btnSend.classList.add('hidden');
+    btnSend.innerHTML   = '&#9632;';
+    btnSend.title       = 'Stop generation';
+    btnSend.classList.add('streaming');
+    btnSend.onclick     = function (e) {
+      e.stopPropagation();
+      dbg('CLICK', 'send button used to abort stream', { requestId: S.currentStream && S.currentStream.requestId });
+      stopStream();
+    };
+    dbg('CLICK', 'send button switched to stop mode');
   }
+}
+
+function updateCtxBar() {
+  var bar = document.getElementById('ctx-bar');
+  if (!bar || !S.activeSession) return;
+  var opts    = Object.assign({}, DEF_PARAMS, S.storedParams);
+  var numCtx  = opts.num_ctx || 4096;
+  var msgs    = S.activeSession.messages || [];
+  var usedChars = msgs.reduce(function (n, m) { return n + (m.content || '').length; }, 0);
+  var usedToks  = Math.round(usedChars / 3.5);
+  var pct       = Math.min(usedToks / numCtx * 100, 100);
+  bar.style.width = pct + '%';
+  var pctEl = document.getElementById('ctx-bar-pct');
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+  var prevClass = bar.className;
+  bar.className = 'ctx-bar' + (pct > 85 ? ' danger' : pct > 60 ? ' warn' : '');
+  if (bar.className !== prevClass) {
+    dbg('INFO', 'context window usage changed zone', {
+      pct:      Math.round(pct),
+      usedToks: usedToks,
+      numCtx:   numCtx,
+      zone:     pct > 85 ? 'danger' : pct > 60 ? 'warn' : 'ok'
+    });
+  }
+  document.getElementById('ctx-bar-wrap').title =
+    '~' + usedToks + ' / ' + numCtx + ' tokens used';
 }
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
-// Import marked.js for proper markdown rendering
-var marked;
-function loadMarked() {
-  if (!marked) {
-    marked = new (window.marked || window.require('marked'))();
-    // Use GitHub-style markdown preset
-    marked.setOptions({
-      gfm: true,
-      breaks: true,
-      sanitize: false
-    });
-  }
-}
+marked.setOptions({ breaks: true, gfm: true });
 
-function renderInline(text) {
-  var h = escapeHtml(text);
-  h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  h = h.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
-  h = h.replace(/\n/g, '<br>');
-  return h;
-}
-
-function renderMarkdown(raw) {
-  if (!raw) return '';
-  loadMarked();
-  try {
-    var html = marked.parse(raw, { breaks: true });
-    // Add syntax highlighting
-    html = html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, function(match, attr, code) {
-      var lang = attr.match(/[^\s]*=/)?.replace('=', '').trim() || '';
-      var hl = '';
-      if (lang && hl) hl = ' data-lang="' + escapeHtml(lang) + '"';
-      return '<pre' + hl + '><code' + (hl ? hl : '') + '>' + escapeHtml(code) + '</code></pre>';
-    });
-    return html;
-  } catch (e) {
-    // Fallback to simple rendering if marked fails
-    return renderInline(raw);
-  }
-}
-
-function renderMarkdown(raw) {
-  if (!raw) return '';
-  var parts = raw.split(/(```[^\n]*\n[\s\S]*?```)/g);
-  return parts.map(function (part, i) {
-    if (i % 2 === 1) {
-      var m = part.match(/```([^\n]*)\n([\s\S]*?)```/);
-      if (m) {
-        var la = m[1].trim() ? ' data-lang="' + escapeHtml(m[1].trim()) + '"' : '';
-        return '<pre' + la + '><code>' + escapeHtml(m[2]) + '</code></pre>';
+// marked v9 dropped the highlight option from setOptions; wire it via the renderer instead
+marked.use({
+  renderer: {
+    code: function(code, lang) {
+      var highlighted;
+      if (lang && hljs.getLanguage(lang)) {
+        highlighted = hljs.highlight(code, { language: lang }).value;
+      } else {
+        highlighted = hljs.highlightAuto(code).value;
       }
-      return escapeHtml(part);
+      return '<pre' + (lang ? ' data-lang="' + lang + '"' : '') + '><code class="hljs">' + highlighted + '</code></pre>';
     }
-    return renderInline(part);
-  }).join('');
+  }
+});
+
+function renderMarkdown(raw) {
+  if (!raw) return '';
+  try {
+    return marked.parse(raw);
+  } catch (e) {
+    return escapeHtml(raw).replace(/\n/g, '<br>');
+  }
 }
 
-// ── RAG helpers ───────────────────────────────────────────────────────────────
+// ── RAG pipeline ──────────────────────────────────────────────────────────────
 
 var STOP_WORDS = new Set(
-  'the a an is are was were be been have has had do does did will would could should may might can this that these those i you he she it we they and or but in on at to for of with by from as'.split(' ')
+  'the a an is are was were be been have has had do does did will would could should may might can this that these those i you he she it we they and or but in on at to for of with by from as into than then also just so more very well still even back after'.split(' ')
 );
 
-function chunkText(text, size) {
-  size = size || 250;
-  var words = text.split(/\s+/);
+// ── Dynamic context budget ────────────────────────────────────────────────────
+// Derive character budget from num_ctx so larger context windows get more content.
+// Reserve ~1200 tokens for conversation history + system prompt + response headroom.
+// 1 token ≈ 3.5 chars for English prose.
+function getContextBudget() {
+  var opts   = Object.assign({}, DEF_PARAMS, S.storedParams);
+  var numCtx = opts.num_ctx || 4096;
+  var reserved = 1200;
+  return Math.min(Math.floor((numCtx - reserved) * 3.5), 80000);
+}
+
+// ── Chunking on paragraph boundaries ─────────────────────────────────────────
+// Split on double-newlines (paragraph breaks preserved by content.js).
+// Merge tiny fragments into neighbours. Split oversized paragraphs at sentences.
+var MAX_CHUNK_CHARS = 600;
+var MIN_CHUNK_CHARS = 60;
+
+function chunkText(text) {
+  var raw = (text || '').split(/\n\n+/);
   var chunks = [];
-  for (var i = 0; i < words.length; i += size) {
-    chunks.push(words.slice(i, i + size).join(' '));
-  }
+  var buf = '';
+
+  raw.forEach(function (para) {
+    para = para.trim();
+    if (!para) return;
+
+    // Oversized paragraph — split at sentence boundaries
+    if (para.length > MAX_CHUNK_CHARS) {
+      if (buf) { chunks.push(buf); buf = ''; }
+      var sentences = para.match(/[^.!?]+[.!?]+["']?\s*/g) || [para];
+      var sentBuf = '';
+      sentences.forEach(function (s) {
+        if (sentBuf.length + s.length > MAX_CHUNK_CHARS && sentBuf) {
+          chunks.push(sentBuf.trim());
+          sentBuf = s;
+        } else {
+          sentBuf += s;
+        }
+      });
+      if (sentBuf.trim()) chunks.push(sentBuf.trim());
+      return;
+    }
+
+    // Tiny fragment — merge into buffer
+    if (para.length < MIN_CHUNK_CHARS) {
+      buf = buf ? buf + ' ' + para : para;
+      return;
+    }
+
+    // Normal paragraph
+    if (buf) { chunks.push(buf); buf = ''; }
+    chunks.push(para);
+  });
+
+  if (buf.trim()) chunks.push(buf.trim());
   return chunks;
 }
 
-function scoreChunk(chunk, queryTerms) {
-  if (!queryTerms.length) return 1; // no terms = include everything (short text)
+// ── Embedding helpers ─────────────────────────────────────────────────────────
+
+function getEmbedding(text, cb) {
+  if (!S.embedModel) { cb(null); return; }
+  dbg('OLLAMA', 'embedding request', { model: S.embedModel, textLen: text.length, preview: text.slice(0, 60) });
+  chrome.runtime.sendMessage({
+    action:  'OLLAMA_FETCH_JSON',
+    url:     S.settings.url + '/api/embed',
+    headers: getHeaders(),
+    body:    JSON.stringify({ model: S.embedModel, input: text })
+  }, function (res) {
+    if (!res || !res.ok || !res.data || !res.data.embeddings) {
+      dbg('ERROR', 'embedding failed', { model: S.embedModel, error: 'no embedding in response' });
+      cb(null);
+      return;
+    }
+    var vec = res.data.embeddings[0];
+    dbg('OLLAMA', 'embedding received', { model: S.embedModel, dims: vec.length });
+    cb(vec);
+  });
+}
+
+function cosineSimilarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  var dot = 0, na = 0, nb = 0;
+  for (var i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na  += a[i] * a[i];
+    nb  += b[i] * b[i];
+  }
+  return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
+
+// ── Scoring ───────────────────────────────────────────────────────────────────
+// Extract query terms — remove stop words, deduplicate.
+function queryTerms(query) {
+  return (query || '').toLowerCase()
+    .split(/\W+/)
+    .filter(function (w) { return w.length > 2 && !STOP_WORDS.has(w); })
+    .filter(function (w, i, a) { return a.indexOf(w) === i; });
+}
+
+// Score a single chunk. Returns a float.
+// - Term frequency: count of matching query terms (with simple stem: also try +s, -s, -ed, -ing)
+// - Heading bonus: headings are high-signal anchors
+// - Position bonus: earlier chunks are often context-setting
+function scoreChunk(chunk, terms, idx, total) {
+  if (!terms.length) return 1;
   var lower = chunk.toLowerCase();
-  var score = 0;
-  queryTerms.forEach(function (t) {
-    var re = new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'gi');
-    var m = lower.match(re);
-    if (m) score += m.length;
+  var tf = 0;
+  terms.forEach(function (t) {
+    // Exact match
+    var exact = new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'gi');
+    var m = lower.match(exact);
+    if (m) tf += m.length;
+    // Stem variants: try stripping/adding common suffixes
+    var stems = [t + 's', t + 'ed', t + 'ing', t.replace(/s$/, ''), t.replace(/ing$/, ''), t.replace(/ed$/, '')];
+    stems.forEach(function (s) {
+      if (s !== t && s.length > 2) {
+        var re = new RegExp('\\b' + s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'gi');
+        var sm = lower.match(re);
+        if (sm) tf += sm.length * 0.5; // half-weight for stem matches
+      }
+    });
   });
-  return score;
+
+  if (tf === 0) return 0;
+
+  // Heading bonus — markdown headings start with #
+  var headingBonus = /^#{1,6} /.test(chunk) ? 2.0 : 1.0;
+
+  // Position bonus — first 20% of document gets 1.25×, rest tapers to 1.0
+  var posWeight = total > 1 ? (1.0 + 0.25 * Math.max(0, 1 - (idx / (total * 0.2)))) : 1.0;
+
+  return tf * headingBonus * posWeight;
 }
 
-function getTopChunks(text, query, maxChunks, maxChars) {
-  maxChunks = maxChunks || 4;
-  maxChars  = maxChars  || 3000;
-  if (!text || !text.trim()) return [];
-  var terms = (query || '').toLowerCase().split(/\W+/)
-    .filter(function (w) { return w.length > 2 && !STOP_WORDS.has(w); });
-  var chunks = chunkText(text);
-  var scored = chunks.map(function (c, idx) {
-    return { c: c, s: scoreChunk(c, terms), idx: idx };
-  });
-  // If no query terms, include first N chunks
-  if (!terms.length) {
-    scored.sort(function (a, b) { return a.idx - b.idx; });
+// ── Selection with adjacent context ──────────────────────────────────────────
+// Shared assembly: pick top-scored items within budget, expand with neighbours,
+// then re-sort into document order.
+function assembleChunks(scored, budget) {
+  var byIdx = {};
+  scored.forEach(function (x) { byIdx[x.idx] = x.c; });
+
+  // Use document order when all scores are equal (e.g. no query terms →
+  // keyword scores all 1) or when no positive scores exist.
+  // For both keyword hits (scores > 1) and cosine similarities (0–1 but
+  // varying), we detect "meaningful order" by checking score variance.
+  var allSame = scored.length <= 1 || scored.every(function (x) { return x.s === scored[0].s; });
+  var hasOrder = !allSame && scored.some(function (x) { return x.s > 0; });
+
+  var ordered;
+  if (!hasOrder) {
+    ordered = scored.slice();
   } else {
-    scored = scored.filter(function (x) { return x.s > 0; });
-    scored.sort(function (a, b) { return b.s - a.s; });
+    ordered = scored.filter(function (x) { return x.s > 0; })
+                    .sort(function (a, b) { return b.s - a.s; });
   }
-  var out = []; var chars = 0;
-  for (var i = 0; i < scored.length && out.length < maxChunks; i++) {
-    if (chars + scored[i].c.length > maxChars) break;
-    out.push(scored[i].c);
-    chars += scored[i].c.length;
+
+  var selected = {};
+  var chars = 0;
+  for (var i = 0; i < ordered.length; i++) {
+    var item = ordered[i];
+    if (chars + item.c.length > budget) break;
+    selected[item.idx] = true;
+    chars += item.c.length;
+
+    [-1, 1].forEach(function (offset) {
+      var ni = item.idx + offset;
+      if (byIdx[ni] !== undefined && !selected[ni]) {
+        if (chars + byIdx[ni].length <= budget) {
+          selected[ni] = true;
+          chars += byIdx[ni].length;
+        }
+      }
+    });
   }
-  return out;
+
+  return Object.keys(selected)
+    .map(Number)
+    .sort(function (a, b) { return a - b; })
+    .map(function (idx) { return byIdx[idx]; })
+    .join('\n\n');
 }
 
-// Build context block from active page context + attachments, using RAG scoring
-function buildContextBlock(userQuery) {
-  var sources = []; var names = [];
+// Keyword fallback: score chunks by term frequency then assemble.
+function selectChunksKeyword(chunks, query, budget) {
+  var terms = queryTerms(query);
+  var total = chunks.length;
+  var scored = chunks.map(function (c, i) {
+    return { c: c, s: scoreChunk(c, terms, i, total), idx: i };
+  });
+  return assembleChunks(scored, budget);
+}
 
-  if (S.usePageContext && S.pageContext && S.pageContext.content) {
-    var chunks = getTopChunks(S.pageContext.content, userQuery);
-    if (chunks.length) {
-      sources.push('=== ' + (S.pageContext.title || S.pageContext.url || 'Page') + ' ===\n' + chunks.join('\n\n'));
-      names.push(S.pageContext.title || 'Page');
-    }
+// Async entry point: uses vector similarity when an embed model is configured,
+// falls back to keyword scoring on failure or when no model is set.
+function selectChunks(text, query, budget, cb) {
+  budget = budget || getContextBudget();
+
+  // Short content fits entirely — skip chunking and embedding entirely.
+  if (!text || text.length < 500) { cb(text ? text.slice(0, budget) : ''); return; }
+
+  var chunks = chunkText(text);
+  if (!chunks.length) { cb(''); return; }
+
+  // Single chunk: nothing to compare against semantically — return it directly.
+  if (chunks.length === 1) { cb(chunks[0].length <= budget ? chunks[0] : chunks[0].slice(0, budget)); return; }
+
+  // Content quality gate — skip embedding on very short/garbage content
+  var totalTextLen = chunks.reduce(function (n, c) { return n + c.length; }, 0);
+  if (!S.embedModel || !query || totalTextLen < 200) {
+    dbg('INFO', 'semantic RAG fallback to keyword scoring', {
+      reason: !S.embedModel ? 'no embed model configured' : !query ? 'no query' : 'content below threshold',
+      totalChars: totalTextLen
+    });
+    cb(selectChunksKeyword(chunks, query, budget));
+    return;
   }
 
-  S.attachments.forEach(function (att) {
-    var chunks = getTopChunks(att.content, userQuery);
-    if (chunks.length) {
-      sources.push('=== ' + att.name + ' ===\n' + chunks.join('\n\n'));
-      names.push(att.name);
-    }
+  dbg('INFO', 'semantic RAG started', { chunkCount: chunks.length, embedModel: S.embedModel, queryPreview: query.slice(0, 60) });
+
+  var scored = chunks.map(function (c, i) { return { c: c, s: 0, idx: i }; });
+
+  // Fire query embedding and all chunk embeddings in parallel
+  var queryEmbedPromise = new Promise(function (resolve) {
+    getEmbedding(query, resolve);
+  });
+  var chunkEmbedPromises = chunks.map(function (chunk, i) {
+    return new Promise(function (resolve) {
+      getEmbedding(chunk, function (vec) {
+        scored[i]._vec = vec;
+        resolve();
+      });
+    });
   });
 
-  if (!sources.length) return null;
-  return { text: '[Context]\n' + sources.join('\n\n'), names: names };
+  Promise.all([queryEmbedPromise].concat(chunkEmbedPromises))
+    .then(function (results) {
+      var queryVec = results[0];
+      if (!queryVec) {
+        dbg('INFO', 'semantic RAG fallback to keyword scoring', { reason: 'embedding call failed' });
+        cb(selectChunksKeyword(chunks, query, budget));
+        return;
+      }
+      scored.forEach(function (item) {
+        item.s = cosineSimilarity(queryVec, item._vec);
+        delete item._vec;
+      });
+      var result = assembleChunks(scored, budget);
+      dbg('INFO', 'semantic RAG complete', { chunkCount: chunks.length, selectedChars: result.length, budget: budget });
+      cb(result);
+    });
+}
+
+// ── Build context block ───────────────────────────────────────────────────────
+// Always include title + meta description as a header — these are free signal
+// that costs few tokens. Then fill the remaining budget with scored chunks.
+// Async because selectChunks may call the embedding API.
+function buildContextBlock(userQuery, cb) {
+  // Fast path — no context sources active, skip all embedding work
+  if (!S.usePageContext && !S.attachments.length) {
+    dbg('INFO', 'buildContextBlock — no context sources active, skipping');
+    cb(null);
+    return;
+  }
+
+  var budget  = getContextBudget();
+  var sources = [];
+  var names   = [];
+
+  var pending = [];
+  if (S.usePageContext && S.pageContext && S.pageContext.content) {
+    pending.push({ type: 'page', pc: S.pageContext });
+  }
+  S.attachments.forEach(function (att) {
+    if (att.type !== 'image') pending.push({ type: 'file', att: att });
+  });
+
+  if (!pending.length) { cb(null); return; }
+
+  var idx = 0;
+  function processNext() {
+    if (idx >= pending.length) {
+      if (sources.length) {
+        var ctxText = '[Context]\n' + sources.join('\n\n');
+        dbg('INFO', 'context block built', { sources: names, totalChars: ctxText.length, semantic: !!S.embedModel });
+        cb({ text: ctxText, names: names });
+      } else {
+        cb(null);
+      }
+      return;
+    }
+    var item      = pending[idx++];
+    var remaining = budget - sources.reduce(function (n, s) { return n + s.length; }, 0);
+    if (remaining < 200) { processNext(); return; }
+
+    if (item.type === 'page') {
+      var pc            = item.pc;
+      var contentBudget = Math.max(remaining - 200, 500);
+      selectChunks(pc.content, userQuery, contentBudget, function (body) {
+        if (body) {
+          var header = '=== ' + (pc.title || pc.url || 'Page') + ' ===';
+          if (pc.description) header += '\n' + pc.description;
+          sources.push(header + '\n\n' + body);
+          names.push(pc.title || 'Page');
+        }
+        processNext();
+      });
+    } else {
+      var att = item.att;
+      selectChunks(att.content, userQuery, remaining - 50, function (body) {
+        if (body) {
+          sources.push('=== ' + att.name + ' ===\n\n' + body);
+          names.push(att.name);
+        }
+        processNext();
+      });
+    }
+  }
+  processNext();
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
 function loadAllData(cb) {
   chrome.storage.local.get(
-    ['ollama_s','ollama_t','ollama_si','ollama_sa','ollama_mp','ollama_tp'],
+    ['ollamaSidebarUrl','ollamaSidebarToken','ollamaSidebarTheme',
+     'ollamaSidebarSystemPrompt','ollamaSidebarDefaultModel','ollamaSidebarParams',
+     'ollama_si','ollama_sa','ollama_tp','ollama_personas','ollama_active_persona',
+     'ollamaSidebarCompact','ollamaSidebarLanguage','ollamaSidebarEmbedModel',
+     'ollamaSidebarAutoScroll'],
     function (r) {
-      // settings
-      var saved = r.ollama_s || {};
-      S.settings.url   = saved.url   || 'http://localhost:11434';
-      S.settings.token = saved.token || '';
-      inputUrl.value   = S.settings.url;
-      inputToken.value = S.settings.token;
-
-      // theme
-      S.theme = r.ollama_t || 'dark';
+      S.settings.url   = r.ollamaSidebarUrl   || 'http://localhost:11434';
+      S.settings.token = r.ollamaSidebarToken  || '';
+      S.storedParams   = r.ollamaSidebarParams  || {};
+      S.defaultModel   = r.ollamaSidebarDefaultModel || '';
+      S.defaultSystemPrompt = r.ollamaSidebarSystemPrompt ||
+        'Be concise and detailed. Give the most information in the fewest words unless the topic requires a longer explanation.';
+      S.theme      = r.ollamaSidebarTheme || 'dark';
+      S.language   = r.ollamaSidebarLanguage || '';
+      S.embedModel = r.ollamaSidebarEmbedModel || '';
+      S.autoScroll = r.ollamaSidebarAutoScroll !== false;
       applyTheme(S.theme);
+      applyCompact(r.ollamaSidebarCompact || false);
+      dbg('INFO', 'compact mode restored from storage', { enabled: S.compact });
+      dbg('INFO', 'language lock loaded', { language: S.language || 'none' });
+      S.sessions  = r.ollama_si || [];
+      var userTemplates = (r.ollama_tp || []).filter(function (t) { return !t.builtin; });
+      S.templates = DEFAULT_TEMPLATES.concat(userTemplates);
+      var userPersonas = (r.ollama_personas || []).filter(function (p) { return !p.builtin; });
+      S.personas = DEFAULT_PERSONAS.concat(userPersonas);
+      S.activePersonaId = r.ollama_active_persona || '__persona_default';
 
-      // default system prompt
-      loadDefaultSystemPrompt();
-
-      // sessions index
-      S.sessions = r.ollama_si || [];
-
-      // model params
-      S.modelParams = r.ollama_mp || {};
-
-      // templates
-      S.templates = r.ollama_tp || [];
-
-      // load active session
       var activeId = r.ollama_sa;
       if (!activeId && S.sessions.length) activeId = S.sessions[0].id;
 
@@ -349,27 +709,6 @@ function loadAllData(cb) {
       }
     }
   );
-}
-
-function saveSettings() {
-  S.settings.url   = inputUrl.value.trim().replace(/\/+$/, '') || 'http://localhost:11434';
-  S.settings.token = inputToken.value;
-  inputUrl.value   = S.settings.url;
-  chrome.storage.local.set({ ollama_s: { url: S.settings.url, token: S.settings.token } });
-  // Save default system prompt if changed
-  if (inputSysPrompt.value !== DEFAULT_SYSTEM_PROMPT) {
-    chrome.storage.local.set({ ollama_s_default_sys: inputSysPrompt.value });
-  }
-}
-
-function loadDefaultSystemPrompt() {
-  chrome.storage.local.get('ollama_s_default_sys', function(r) {
-    var saved = r['ollama_s_default_sys'];
-    if (saved && typeof saved === 'string') {
-      inputSysPrompt.value = saved;
-      if (S.activeSession) S.activeSession.systemPrompt = saved;
-    }
-  });
 }
 
 function saveSession(sess) {
@@ -403,19 +742,25 @@ function deleteSessionFromStorage(id) {
   chrome.storage.local.set({ ollama_si: S.sessions });
 }
 
-function saveModelParams() {
-  chrome.storage.local.set({ ollama_mp: S.modelParams });
+function saveTemplates() {
+  var userOnly = S.templates.filter(function (t) { return !t.builtin; });
+  chrome.storage.local.set({ ollama_tp: userOnly });
 }
 
-function saveTemplates() {
-  chrome.storage.local.set({ ollama_tp: S.templates });
+function savePersonas() {
+  var userOnly = S.personas.filter(function (p) { return !p.builtin; });
+  chrome.storage.local.set({ ollama_personas: userOnly });
+}
+
+function saveActivePersona(id) {
+  S.activePersonaId = id;
+  chrome.storage.local.set({ ollama_active_persona: id });
 }
 
 // ── Session management ────────────────────────────────────────────────────────
 
 function createSessionObj(name) {
-  var model = (selectModel && selectModel.value) || '';
-  // Auto-generate title from first message if no name provided
+  var model = S.defaultModel || '';
   var generatedName = '';
   if (!name && S.attachments.length === 0 && S.pageContext) {
     var ctx = S.pageContext.title || S.pageContext.url || 'page';
@@ -425,7 +770,7 @@ function createSessionObj(name) {
     id:           genId(),
     name:         name || generatedName || 'New Chat',
     model:        model,
-    systemPrompt: '',
+    systemPrompt: S.defaultSystemPrompt || '',
     messages:     [],
     createdAt:    Date.now(),
     updatedAt:    Date.now()
@@ -435,6 +780,7 @@ function createSessionObj(name) {
 function newSession() {
   if (S.activeSession) saveSession(S.activeSession);
   var sess = createSessionObj('New Chat');
+  dbg('SESSION', 'new session created', { id: sess.id });
   S.activeSession = sess;
   saveSession(sess);
   renderSession();
@@ -449,6 +795,7 @@ function switchSession(id) {
     var sess = r['ollama_ss_' + id];
     if (!sess) return;
     S.activeSession = sess;
+    dbg('SESSION', 'session switched', { id: id });
     chrome.storage.local.set({ ollama_sa: id });
     renderSession();
     updateSessionsPanel();
@@ -457,7 +804,7 @@ function switchSession(id) {
 }
 
 function deleteSession(id) {
-  if (!confirm('Delete this conversation?')) return;
+  dbg('SESSION', 'session deleted', { id: id });
   deleteSessionFromStorage(id);
   if (S.activeSession && S.activeSession.id === id) {
     if (S.sessions.length) {
@@ -474,22 +821,39 @@ function deleteSession(id) {
 function renameSession(id) {
   var meta = S.sessions.find(function (s) { return s.id === id; });
   if (!meta) return;
-  var name = prompt('Rename conversation:', meta.name);
-  if (!name || !name.trim()) return;
-  name = name.trim().slice(0, 80);
-  meta.name = name;
-  if (S.activeSession && S.activeSession.id === id) {
-    S.activeSession.name = name;
-    saveSession(S.activeSession);
+  var current = meta.name;
+
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = current;
+  inp.maxLength = 80;
+  inp.className = 'session-name-input';
+  sessionNameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+
+  function commit() {
+    var name = inp.value.trim().slice(0, 80) || current;
+    inp.replaceWith(sessionNameEl);
     sessionNameEl.textContent = name;
-  } else {
-    chrome.storage.local.get('ollama_ss_' + id, function (r) {
-      var sess = r['ollama_ss_' + id];
-      if (sess) { sess.name = name; saveSession(sess); }
-      else { chrome.storage.local.set({ ollama_si: S.sessions }); }
-    });
+    meta.name = name;
+    if (S.activeSession && S.activeSession.id === id) {
+      S.activeSession.name = name;
+      saveSession(S.activeSession);
+    } else {
+      chrome.storage.local.get('ollama_ss_' + id, function (r) {
+        var sess = r['ollama_ss_' + id];
+        if (sess) { sess.name = name; saveSession(sess); }
+        else { chrome.storage.local.set({ ollama_si: S.sessions }); }
+      });
+    }
+    updateSessionsPanel();
   }
-  updateSessionsPanel();
+
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { inp.replaceWith(sessionNameEl); }
+  });
+  inp.addEventListener('blur', commit);
 }
 
 function exportSession(sess) {
@@ -505,15 +869,11 @@ function exportSession(sess) {
   (sess.messages || []).forEach(function (m) {
     lines.push('**' + (m.role === 'user' ? 'You' : 'Assistant') + ':**', '', m.content, '', '---', '');
   });
-  var blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  a.href = url;
-  a.download = (sess.name || 'chat').replace(/[^a-z0-9\-_ ]/gi, '-').slice(0,60) + '.md';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var text = lines.join('\n');
+  exportOverlayTitle.textContent = sess.name || 'Export';
+  exportContent.textContent = text;
+  btnExportCopy.textContent = 'Copy';
+  exportOverlay.classList.remove('hidden');
 }
 
 // ── Model management ──────────────────────────────────────────────────────────
@@ -527,13 +887,13 @@ function fetchModels() {
         if (chrome.runtime.lastError || !response) {
           var e = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'No response';
           setStatus('error', humanizeError(e));
-          setSettingsStatus(humanizeError(e), 'err');
+          dbg('ERROR', 'fetchModels failed', { error: e });
           resolve(); return;
         }
         if (!response.ok) {
           var msg = humanizeError(response.error || ('HTTP ' + response.status));
           setStatus('error', msg);
-          setSettingsStatus(msg, 'err');
+          dbg('ERROR', 'fetchModels failed', { error: msg });
           resolve(); return;
         }
         var raw = response.data.models || [];
@@ -544,9 +904,8 @@ function fetchModels() {
             sizeLabel:  m.size ? formatBytes(m.size) : ''
           };
         });
-        populateModels();
         setStatus('connected', 'Connected');
-        setSettingsStatus('Connected — ' + S.models.length + ' model(s)', 'ok');
+        dbg('MODEL', 'models fetched', { count: S.models.length, models: S.models.map(function(m){ return m.name; }) });
         resolve();
       }
     );
@@ -554,24 +913,23 @@ function fetchModels() {
 }
 
 function populateModels() {
-  var current = (S.activeSession && S.activeSession.model) || '';
-  selectModel.innerHTML = '<option value="">-- select model --</option>';
-  S.models.forEach(function (m) {
-    var opt   = document.createElement('option');
-    opt.value = m.name;
-    var lbl   = m.name;
-    if (m.paramSize)  lbl += ' (' + m.paramSize + ')';
-    if (m.sizeLabel)  lbl += ' · ' + m.sizeLabel;
-    opt.textContent = lbl;
-    if (m.name === current) opt.selected = true;
-    selectModel.appendChild(opt);
-  });
-  if (selectModel.value && S.activeSession) S.activeSession.model = selectModel.value;
+  if (!S.activeSession) { populateModelSelect(); return; }
+  if (!S.activeSession.model && S.defaultModel) {
+    S.activeSession.model = S.defaultModel;
+    debouncedSaveSession();
+  }
+  var names = S.models.map(function (m) { return m.name; });
+  if (S.activeSession.model && names.length && names.indexOf(S.activeSession.model) === -1) {
+    var fallback = (S.defaultModel && names.indexOf(S.defaultModel) !== -1)
+      ? S.defaultModel : (names[0] || '');
+    S.activeSession.model = fallback;
+    debouncedSaveSession();
+  }
+  populateModelSelect();
 }
 
 function getModelOptions() {
-  var model = (S.activeSession && S.activeSession.model) || selectModel.value || '';
-  return Object.assign({}, DEF_PARAMS, S.modelParams[model] || {});
+  return Object.assign({}, DEF_PARAMS, S.storedParams);
 }
 
 // ── Page context ──────────────────────────────────────────────────────────────
@@ -594,10 +952,11 @@ function getPageContent() {
 }
 
 async function togglePageContext() {
+  dbg('INFO', 'page context toggled', { enabled: !S.usePageContext });
   if (S.usePageContext) {
     S.usePageContext = false; S.pageContext = null;
     btnPageContext.classList.remove('active');
-    pageCtxLbl.textContent = 'Page';
+    pageCtxLbl.textContent = 'Add page';
     return;
   }
   btnPageContext.disabled = true;
@@ -605,11 +964,13 @@ async function togglePageContext() {
   try {
     var ctx = await getPageContent();
     S.pageContext = ctx; S.usePageContext = true;
+    dbg('INFO', 'page context fetched', { wordCount: ctx.content ? ctx.content.split(/\s+/).length : 0, url: ctx.url });
     btnPageContext.classList.add('active');
     var title = (ctx.title || ctx.url || 'page').trim();
     pageCtxLbl.textContent = title.length > 20 ? title.slice(0, 18) + '…' : title;
   } catch (e) {
-    pageCtxLbl.textContent = 'Page';
+    dbg('ERROR', 'page context failed', { error: e.message });
+    pageCtxLbl.textContent = 'Add page';
     appendSystemMsg('Could not read page: ' + e.message);
   } finally {
     btnPageContext.disabled = false;
@@ -618,7 +979,35 @@ async function togglePageContext() {
 
 // ── File attachments ──────────────────────────────────────────────────────────
 
-function extractPdfText(buffer) {
+async function extractPdfText(buffer) {
+  if (typeof pdfjsLib === 'undefined') {
+    dbg('ERROR', 'PDF.js not loaded — falling back to byte scan');
+    return extractPdfTextFallback(buffer);
+  }
+  try {
+    var pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    dbg('INFO', 'PDF loaded', { pages: pdf.numPages });
+    var allText = [];
+    for (var i = 1; i <= pdf.numPages; i++) {
+      var page    = await pdf.getPage(i);
+      var content = await page.getTextContent();
+      var pageText = content.items
+        .map(function (item) { return item.str; })
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (pageText) allText.push('--- Page ' + i + ' ---\n' + pageText);
+    }
+    var result = allText.join('\n\n');
+    dbg('INFO', 'PDF text extracted', { pages: pdf.numPages, chars: result.length });
+    return result;
+  } catch (e) {
+    dbg('ERROR', 'PDF.js extraction failed', { error: e.message });
+    return extractPdfTextFallback(buffer);
+  }
+}
+
+function extractPdfTextFallback(buffer) {
   var bytes = new Uint8Array(buffer);
   var runs = []; var cur = '';
   for (var i = 0; i < bytes.length; i++) {
@@ -628,18 +1017,21 @@ function extractPdfText(buffer) {
     else { if (cur.length > 3) runs.push(cur); cur = ''; }
   }
   if (cur.length > 3) runs.push(cur);
-  return runs.filter(function (s) { return !/^[\/\-\(\)\.]{2,}$/.test(s.trim()); })
-    .join(' ').replace(/\s+/g, ' ').trim().slice(0, 12000);
+  return runs
+    .filter(function (s) { return !/^[\/\-\(\)\.]{2,}$/.test(s.trim()); })
+    .join(' ').replace(/\s+/g, ' ').trim();
 }
 
 function handleFiles(files) {
+  dbg('FILE', 'handleFiles called', { count: files.length, names: Array.from(files).map(function(f){ return f.name; }) });
   Array.prototype.forEach.call(files, function (file) {
     var name = file.name;
     var ext  = name.split('.').pop().toLowerCase();
     if (ext === 'pdf') {
       var reader = new FileReader();
-      reader.onload = function (e) {
-        var text = extractPdfText(e.target.result);
+      reader.onload = async function (e) {
+        dbg('FILE', 'PDF file read, extracting text', { name: name });
+        var text = await extractPdfText(e.target.result);
         S.attachments.push({ name: name, content: text });
         renderFileChips();
       };
@@ -653,7 +1045,24 @@ function handleFiles(files) {
       reader2.readAsText(file);
     }
   });
-  fileInput.value = '';
+}
+
+function handleImages(files) {
+  dbg('FILE', 'image files received', {
+    count:  files.length,
+    names:  files.map(function(f){ return f.name; }),
+    types:  files.map(function(f){ return f.type; })
+  });
+  files.forEach(function (file) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var b64 = e.target.result.split(',')[1];
+      S.attachments.push({ name: file.name, type: 'image', mime: file.type, content: b64 });
+      dbg('FILE', 'image encoded and attached', { name: file.name, mime: file.type, b64Len: b64.length });
+      renderFileChips();
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function removeAttachment(idx) {
@@ -670,9 +1079,16 @@ function renderFileChips() {
   S.attachments.forEach(function (att, i) {
     var chip = document.createElement('div');
     chip.className = 'file-chip';
-    chip.innerHTML =
-      '<span class="file-chip-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(att.name) + '</span>' +
-      '<button class="file-chip-del" data-idx="' + i + '" title="Remove">&#10005;</button>';
+    if (att.type === 'image') {
+      chip.innerHTML =
+        '<img class="file-chip-thumb" src="data:' + att.mime + ';base64,' + att.content + '" alt="' + escapeHtml(att.name) + '">' +
+        '<span class="file-chip-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(att.name) + '</span>' +
+        '<button class="file-chip-del" data-idx="' + i + '" title="Remove">&#10005;</button>';
+    } else {
+      chip.innerHTML =
+        '<span class="file-chip-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(att.name) + '</span>' +
+        '<button class="file-chip-del" data-idx="' + i + '" title="Remove">&#10005;</button>';
+    }
     fileChipsEl.appendChild(chip);
   });
 }
@@ -681,21 +1097,34 @@ function renderFileChips() {
 
 function renderTmplOverlay() {
   tmplList.innerHTML = '';
-  if (!S.templates.length) {
-    tmplList.innerHTML = '<div style="padding:12px;color:var(--fg3);font-size:12px;">No templates yet.</div>';
-    return;
-  }
-  S.templates.forEach(function (t) {
+  var builtins = S.templates.filter(function (t) { return t.builtin; });
+  var user     = S.templates.filter(function (t) { return !t.builtin; });
+
+  function makeItem(t) {
     var el = document.createElement('div');
     el.className = 'tmpl-item';
+    var action = t.builtin
+      ? '<span class="tmpl-builtin-badge" title="Built-in">&#128274;</span>'
+      : '<button class="tmpl-item-del" data-id="' + t.id + '" title="Delete">&#10005;</button>';
     el.innerHTML =
       '<div class="tmpl-item-body">' +
         '<div class="tmpl-item-name">' + escapeHtml(t.name) + '</div>' +
         '<div class="tmpl-item-text">' + escapeHtml((t.content || '').slice(0, 80)) + '</div>' +
-      '</div>' +
-      '<button class="tmpl-item-del" data-id="' + t.id + '" title="Delete">&#10005;</button>';
+      '</div>' + action;
     tmplList.appendChild(el);
-  });
+  }
+
+  builtins.forEach(makeItem);
+
+  if (user.length) {
+    var sep = document.createElement('div');
+    sep.className = 'tmpl-section-label';
+    sep.textContent = 'Your templates';
+    tmplList.appendChild(sep);
+    user.forEach(makeItem);
+  } else if (!builtins.length) {
+    tmplList.innerHTML = '<div style="padding:12px;color:var(--fg3);font-size:12px;">No templates yet.</div>';
+  }
 }
 
 function renderTmplDropdown(filter) {
@@ -723,19 +1152,148 @@ function renderTmplDropdown(filter) {
   templateDropdown.classList.remove('hidden');
 }
 
+function applyPersona(id) {
+  var persona = S.personas.find(function (p) { return p.id === id; });
+  if (!persona || !S.activeSession) return;
+  dbg('PERSONA', 'applied', { id: id, name: persona.name });
+  S.activeSession.systemPrompt = persona.prompt;
+  saveActivePersona(id);
+  debouncedSaveSession();
+  updatePersonaButton();
+}
+
+function updatePersonaButton() {
+  var btn = document.getElementById('btn-persona');
+  if (!btn) return;
+  var persona = S.personas.find(function (p) { return p.id === S.activePersonaId; });
+  btn.title = persona ? ('Persona: ' + persona.name) : 'Switch persona';
+  btn.classList.toggle('active', !!S.activePersonaId && S.activePersonaId !== '__persona_default');
+}
+
+function renderPersonaOverlay() {
+  personaList.innerHTML = '';
+  var builtins = S.personas.filter(function (p) { return p.builtin; });
+  var user     = S.personas.filter(function (p) { return !p.builtin; });
+
+  function makeItem(p) {
+    var isActive = S.activePersonaId === p.id;
+    var el = document.createElement('div');
+    el.className = 'tmpl-item' + (isActive ? ' persona-active' : '');
+    var action = p.builtin
+      ? '<span class="tmpl-builtin-badge" title="Built-in">&#128274;</span>'
+      : '<button class="tmpl-item-del" data-id="' + p.id + '" title="Delete">&#10005;</button>';
+    el.innerHTML =
+      '<div class="tmpl-item-body" style="cursor:pointer">' +
+        '<div class="tmpl-item-name">' + escapeHtml(p.name) +
+          (isActive ? ' <span style="color:var(--accent);font-size:10px;">&#9679; active</span>' : '') +
+        '</div>' +
+        '<div class="tmpl-item-text">' + escapeHtml((p.prompt || '').slice(0, 80)) + '</div>' +
+      '</div>' + action;
+    el.querySelector('.tmpl-item-body').addEventListener('click', function () {
+      applyPersona(p.id);
+      personaOverlay.classList.add('hidden');
+    });
+    personaList.appendChild(el);
+  }
+
+  builtins.forEach(makeItem);
+  if (user.length) {
+    var sep = document.createElement('div');
+    sep.className = 'tmpl-section-label';
+    sep.textContent = 'Your personas';
+    personaList.appendChild(sep);
+    user.forEach(makeItem);
+  }
+
+  personaList.addEventListener('click', function (e) {
+    var btn = e.target.closest('.tmpl-item-del');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    S.personas = S.personas.filter(function (p) { return p.id !== id || p.builtin; });
+    if (S.activePersonaId === id) applyPersona('__persona_default');
+    savePersonas();
+    renderPersonaOverlay();
+  }, { once: true });
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 function applyTheme(t) {
   S.theme = t;
   app.setAttribute('data-theme', t);
-  chrome.storage.local.set({ ollama_t: t });
+  chrome.storage.local.set({ ollamaSidebarTheme: t });
+}
+
+function applyCompact(on) {
+  S.compact = on;
+  app.classList.toggle('compact', on);
+  chrome.storage.local.set({ ollamaSidebarCompact: on });
+  dbg('INFO', 'compact mode', { enabled: on });
 }
 
 function closePanels() {
-  settingsPanel.classList.add('hidden');
-  btnSettings.classList.remove('active');
   sessionsPanel.classList.add('hidden');
   btnSessions.classList.remove('active');
+  sessionSearch.value = '';
+  updateSessionsPanel();
+}
+
+function renderSessionItem(s) {
+  var el = document.createElement('div');
+  el.className = 'session-item' + (S.activeSession && S.activeSession.id === s.id ? ' active' : '');
+  var ts = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '';
+  el.innerHTML =
+    '<div class="session-item-name" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</div>' +
+    '<div class="session-item-meta">' + escapeHtml(ts) + '</div>' +
+    '<div class="session-item-actions">' +
+      '<button class="icon-btn sm" data-action="rename" data-id="' + s.id + '" title="Rename">&#9998;</button>' +
+      '<button class="icon-btn sm danger" data-action="delete" data-id="' + s.id + '" title="Delete">&#10005;</button>' +
+    '</div>';
+  el.addEventListener('click', function (e) {
+    if (e.target.closest('[data-action]')) return;
+    switchSession(s.id);
+  });
+  return el;
+}
+
+function renderFilteredSessions(list) {
+  dbg('SESSION', 'search results rendered', { showing: list.length });
+  sessionsList.innerHTML = '';
+  if (!list.length) {
+    sessionsList.innerHTML = '<div style="padding:8px;color:var(--fg3);font-size:12px;">No matches.</div>';
+    return;
+  }
+  list.forEach(function (s) { sessionsList.appendChild(renderSessionItem(s)); });
+}
+
+function filterSessions(query) {
+  query = (query || '').toLowerCase().trim();
+  if (!query) { renderFilteredSessions(S.sessions); return; }
+
+  dbg('SESSION', 'search query entered', { query: query, totalSessions: S.sessions.length });
+
+  var nameMatches = S.sessions.filter(function (s) {
+    return s.name.toLowerCase().includes(query);
+  });
+  dbg('SESSION', 'search name matches', { count: nameMatches.length });
+  var remaining = S.sessions.filter(function (s) {
+    return !s.name.toLowerCase().includes(query);
+  });
+
+  if (!remaining.length) { renderFilteredSessions(nameMatches); return; }
+
+  var keys = remaining.map(function (s) { return 'ollama_ss_' + s.id; });
+  chrome.storage.local.get(keys, function (r) {
+    var contentMatches = remaining.filter(function (s) {
+      var sess = r['ollama_ss_' + s.id];
+      if (!sess || !sess.messages) return false;
+      return sess.messages.some(function (m) {
+        return (m.content || '').toLowerCase().includes(query);
+      });
+    });
+    dbg('SESSION', 'search content matches', { count: contentMatches.length });
+    renderFilteredSessions(nameMatches.concat(contentMatches));
+  });
 }
 
 function updateSessionsPanel() {
@@ -743,24 +1301,7 @@ function updateSessionsPanel() {
     sessionsList.innerHTML = '<div style="padding:8px;color:var(--fg3);font-size:12px;">No saved sessions.</div>';
     return;
   }
-  sessionsList.innerHTML = '';
-  S.sessions.forEach(function (s) {
-    var el   = document.createElement('div');
-    el.className = 'session-item' + (S.activeSession && S.activeSession.id === s.id ? ' active' : '');
-    var ts   = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '';
-    el.innerHTML =
-      '<div class="session-item-name" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</div>' +
-      '<div class="session-item-meta">' + escapeHtml(ts) + '</div>' +
-      '<div class="session-item-actions">' +
-        '<button class="icon-btn sm" data-action="rename" data-id="' + s.id + '" title="Rename">&#9998;</button>' +
-        '<button class="icon-btn sm danger" data-action="delete" data-id="' + s.id + '" title="Delete">&#10005;</button>' +
-      '</div>';
-    el.addEventListener('click', function (e) {
-      if (e.target.closest('[data-action]')) return;
-      switchSession(s.id);
-    });
-    sessionsList.appendChild(el);
-  });
+  filterSessions(sessionSearch ? sessionSearch.value : '');
 }
 
 function updateSessionBar() {
@@ -768,66 +1309,51 @@ function updateSessionBar() {
   sessionNameEl.textContent = S.activeSession.name;
 }
 
-function updateModelDisplay() {
-  var model = S.activeSession && S.activeSession.model || selectModel.value || '';
-  var display = model || '(no model)';
-  document.getElementById('model-display').textContent = display;
-}
-
-function renderParamsPanel() {
-  var opts = getModelOptions();
-  paramsGrid.innerHTML = '';
-  PARAM_META.forEach(function (pm) {
-    var val = opts[pm.key] !== undefined ? opts[pm.key] : DEF_PARAMS[pm.key];
-    var lbl = document.createElement('label');
-    lbl.className = 'param-lbl';
-    lbl.htmlFor   = 'param_' + pm.key;
-    lbl.textContent = pm.label;
-
-    var inp = document.createElement('input');
-    inp.id        = 'param_' + pm.key;
-    inp.type      = 'number';
-    inp.className = 'param-input';
-    inp.value     = val;
-    inp.min       = pm.min;
-    inp.max       = pm.max;
-    inp.step      = pm.step;
-    inp.addEventListener('change', function () {
-      var model = (S.activeSession && S.activeSession.model) || selectModel.value || '';
-      if (!S.modelParams[model]) S.modelParams[model] = {};
-      S.modelParams[model][pm.key] = parseFloat(this.value);
-      saveModelParams();
-    });
-
-    var valEl = document.createElement('span');
-    valEl.className = 'param-val';
-    valEl.textContent = val;
-    inp.addEventListener('input', function () { valEl.textContent = this.value; });
-
-    paramsGrid.appendChild(lbl);
-    paramsGrid.appendChild(inp);
-    paramsGrid.appendChild(valEl);
+function populateModelSelect() {
+  var current = (S.activeSession && S.activeSession.model) || '';
+  modelSelect.innerHTML = '';
+  if (!S.models.length) {
+    var opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '(no model)';
+    modelSelect.appendChild(opt);
+  }
+  S.models.forEach(function(m) {
+    var opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    modelSelect.appendChild(opt);
   });
+  modelSelect.value = current;
+
+  // Keep the secondary compare selector in sync
+  var currentB = modelSelectB.value;
+  modelSelectB.innerHTML = '';
+  var ph = document.createElement('option');
+  ph.value = ''; ph.textContent = '(second model)';
+  modelSelectB.appendChild(ph);
+  S.models.forEach(function(m) {
+    var opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    modelSelectB.appendChild(opt);
+  });
+  if (currentB) modelSelectB.value = currentB;
+  dbg('MODEL', 'populate model select B', { count: S.models.length, currentB: modelSelectB.value });
 }
 
 function renderSession() {
   if (!S.activeSession) return;
   updateSessionBar();
-  // Sync system prompt field
-  inputSysPrompt.value = S.activeSession.systemPrompt || '';
-  // Sync model selector
-  if (S.activeSession.model && selectModel) {
-    selectModel.value = S.activeSession.model;
-    if (!selectModel.value && S.activeSession.model) {
-      // Model not in list yet, will be set after fetchModels
-    }
-  }
+  populateModelSelect();
   renderAllMessages();
+  updatePersonaButton();
 }
 
 // ── Message rendering ─────────────────────────────────────────────────────────
 
-function scrollToBottom() { chatArea.scrollTop = chatArea.scrollHeight; }
+function scrollToBottom() {
+  if (S.autoScroll) chatArea.scrollTop = chatArea.scrollHeight;
+}
 
 function showEmptyState() {
   if (messagesEl.children.length) return;
@@ -847,11 +1373,25 @@ function removeEmptyState() {
 function appendSystemMsg(text) {
   var w = document.createElement('div');
   w.className = 'message error';
-  var b = document.createElement('div');
-  b.className = 'msg-bubble'; b.textContent = humanizeError(text);
+
   var body = document.createElement('div');
-  body.className = 'msg-body'; body.appendChild(b);
-  w.appendChild(body); messagesEl.appendChild(w); scrollToBottom();
+  body.className = 'msg-body';
+
+  var b = document.createElement('div');
+  b.className = 'msg-bubble sys-msg-bubble';
+  b.textContent = humanizeError(text);
+
+  var dismiss = document.createElement('button');
+  dismiss.className = 'sys-msg-dismiss';
+  dismiss.title     = 'Dismiss';
+  dismiss.innerHTML = '&#10005;';
+  dismiss.addEventListener('click', function () { w.remove(); });
+
+  b.appendChild(dismiss);
+  body.appendChild(b);
+  w.appendChild(body);
+  messagesEl.appendChild(w);
+  scrollToBottom();
 }
 
 function buildMessageEl(msg, index) {
@@ -924,12 +1464,13 @@ function buildMessageEl(msg, index) {
 
 function renderAllMessages() {
   messagesEl.innerHTML = '';
-  if (!S.activeSession || !S.activeSession.messages.length) { showEmptyState(); return; }
+  if (!S.activeSession || !S.activeSession.messages.length) { showEmptyState(); updateCtxBar(); return; }
   S.activeSession.messages.forEach(function (msg, i) {
     messagesEl.appendChild(buildMessageEl(msg, i));
   });
   // Add regen button to last assistant message
   updateRegenButton();
+  updateCtxBar();
   scrollToBottom();
 }
 
@@ -953,12 +1494,105 @@ function updateRegenButton() {
   }
 }
 
+// ── Compare mode ─────────────────────────────────────────────────────────────
+
+function toggleCompare() {
+  S.compareMode = !S.compareMode;
+  dbg('INFO', 'compare mode toggled', { enabled: S.compareMode });
+  btnCompare.classList.toggle('active', S.compareMode);
+  modelSelectB.classList.toggle('hidden', !S.compareMode);
+  messagesEl.className = S.compareMode ? 'messages compare-layout' : 'messages';
+  if (!S.compareMode) {
+    renderAllMessages();
+  }
+}
+
+function buildCompareColumn(modelName) {
+  var el     = document.createElement('div');
+  el.className = 'compare-col';
+  var header = document.createElement('div');
+  header.className = 'compare-col-header';
+  header.textContent = modelName;
+  var bubble = document.createElement('div');
+  bubble.className = 'msg-bubble streaming';
+  el.appendChild(header);
+  el.appendChild(bubble);
+  return { el: el, bubble: bubble, text: '' };
+}
+
+function fireCompareStream(model, msgs, col, requestId, onDone) {
+  dbg('STREAM', 'compare stream started', { model: model, requestId: requestId });
+  chrome.runtime.sendMessage({
+    action:    'OLLAMA_FETCH',
+    requestId: requestId,
+    url:       S.settings.url + '/api/chat',
+    headers:   getHeaders(),
+    body:      JSON.stringify({ model: model, messages: msgs, stream: true, options: getModelOptions() })
+  });
+  var listener = function (msg) {
+    if (msg.requestId !== requestId) return;
+    if (msg.action === 'STREAM_CHUNK') {
+      col.text += msg.text;
+      col.bubble.innerHTML = renderMarkdown(col.text);
+      scrollToBottom();
+    }
+    if (msg.action === 'STREAM_DONE') {
+      dbg('STREAM', 'compare stream complete', { model: model, requestId: requestId, chars: col.text.length });
+      col.bubble.classList.remove('streaming');
+      chrome.runtime.onMessage.removeListener(listener);
+      if (onDone) onDone();
+    }
+    if (msg.action === 'STREAM_ERROR') {
+      dbg('ERROR', 'compare stream failed', { model: model, requestId: requestId, error: msg.error });
+      col.bubble.classList.remove('streaming');
+      col.bubble.textContent = humanizeError(msg.error || 'Stream error');
+      chrome.runtime.onMessage.removeListener(listener);
+      if (onDone) onDone();
+    }
+  };
+  chrome.runtime.onMessage.addListener(listener);
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
+
+function generateSessionTitle(firstUserMessage) {
+  if (!S.activeSession || S.activeSession.name !== 'New Chat') return;
+  var sessionId = S.activeSession.id;
+  var chatModel = S.activeSession.model;
+  chrome.storage.local.get('ollamaSidebarTitleModel', function (r) {
+    var titleModel = r.ollamaSidebarTitleModel || chatModel;
+    if (!titleModel) return;
+    chrome.runtime.sendMessage({
+      action:  'OLLAMA_FETCH_JSON',
+      url:     S.settings.url + '/api/chat',
+      headers: getHeaders(),
+      body:    JSON.stringify({
+        model:    titleModel,
+        messages: [{ role: 'user', content: 'Summarize this in 4 words or less, just the title, no punctuation: ' + firstUserMessage }],
+        stream:   false
+      })
+    }, function (response) {
+      if (!response || !response.ok) return;
+      var title = ((response.data && response.data.message && response.data.message.content) || '').trim();
+      if (!title) return;
+      title = title.slice(0, 80);
+      if (!S.activeSession || S.activeSession.id !== sessionId || S.activeSession.name !== 'New Chat') return;
+      S.activeSession.name = title;
+      saveSession(S.activeSession);
+      sessionNameEl.textContent = title;
+      updateSessionsPanel();
+    });
+  });
+}
 
 function buildApiMessages() {
   var out = [];
   if (S.activeSession && S.activeSession.systemPrompt) {
     out.push({ role: 'system', content: S.activeSession.systemPrompt });
+  }
+  if (S.language && out.length && out[0].role === 'system') {
+    out[0].content += '\n\nAlways respond in ' + S.language + '.';
+    dbg('INFO', 'language lock applied', { language: S.language });
   }
   (S.activeSession && S.activeSession.messages || []).forEach(function (m) {
     out.push({ role: m.role, content: m.content });
@@ -971,43 +1605,86 @@ function doSendChat(text) {
   if (!text || !text.trim()) return;
   if (!S.activeSession) return;
 
-  var model = selectModel.value;
-  if (!model) { appendSystemMsg('Please select a model first.'); return; }
+  var model = (S.activeSession && S.activeSession.model) || '';
+  if (!model) { appendSystemMsg('No model selected — open Settings to choose a default model.'); return; }
   S.activeSession.model = model;
 
-  // Collect context
-  var ctx = buildContextBlock(text);
+  var imageAttachments = S.attachments.filter(function (a) { return a.type === 'image'; });
 
-  // Build actual user content (with context prefix)
-  var apiContent = text;
-  if (ctx) apiContent = ctx.text + '\n\n' + text;
-
+  // Lock UI immediately
   removeEmptyState();
   inputMessage.value = '';
   inputMessage.style.height = '';
   setSendEnabled(false);
   S.isStreaming = true;
 
-  // User message (display only the typed text)
+  var _t0 = Date.now();
+  dbg('INFO', 'doSendChat step', { step: 'start', usePageContext: S.usePageContext, attachments: S.attachments.length, embedModel: !!S.embedModel });
+
+  // ── Compare mode: render user bubble now, fire streams after context resolves ─
+  if (S.compareMode) {
+    var modelA = S.activeSession.model;
+    var modelB = modelSelectB.value;
+    if (!modelA || !modelB) {
+      if (!modelB) dbg('ERROR', 'compare aborted — second model not selected');
+      appendSystemMsg('Select two models to compare.');
+      S.isStreaming = false;
+      setSendEnabled(true);
+      return;
+    }
+
+    // Render user prompt immediately (display-only, not stored)
+    var uDisplay = document.createElement('div');
+    uDisplay.className = 'message user';
+    var uBody = document.createElement('div'); uBody.className = 'msg-body';
+    var uBubble = document.createElement('div'); uBubble.className = 'msg-bubble';
+    uBubble.textContent = text;
+    uBody.appendChild(uBubble); uDisplay.appendChild(uBody);
+    messagesEl.appendChild(uDisplay);
+
+    var row = document.createElement('div');
+    row.className = 'compare-row';
+    var colA = buildCompareColumn(modelA);
+    var colB = buildCompareColumn(modelB);
+    row.appendChild(colA.el);
+    row.appendChild(colB.el);
+    messagesEl.appendChild(row);
+    scrollToBottom();
+    appendSystemMsg('Compare results are not saved to conversation history.');
+
+    buildContextBlock(text, function (ctx) {
+      dbg('INFO', 'doSendChat step', { step: 'context-resolved', ms: Date.now() - _t0, hasCtx: !!ctx });
+      var apiContent = ctx ? ctx.text + '\n\n' + text : text;
+      var compareMsgs = [];
+      if (S.activeSession.systemPrompt) compareMsgs.push({ role: 'system', content: S.activeSession.systemPrompt });
+      var cUserMsg = { role: 'user', content: apiContent };
+      if (imageAttachments.length) cUserMsg.images = imageAttachments.map(function (a) { return a.content; });
+      compareMsgs.push(cUserMsg);
+      dbg('INFO', 'compare send initiated', { modelA: modelA, modelB: modelB, msgCount: compareMsgs.length });
+      dbg('INFO', 'doSendChat step', { step: 'before-fetch', ms: Date.now() - _t0 });
+
+      var cPending = 2;
+      function onCompareDone() {
+        if (--cPending === 0) {
+          S.isStreaming = false;
+          setSendEnabled(true);
+          inputMessage.focus();
+        }
+      }
+      fireCompareStream(modelA, compareMsgs, colA, genId(), onCompareDone);
+      fireCompareStream(modelB, compareMsgs, colB, genId(), onCompareDone);
+    });
+    return;
+  }
+
+  // ── Normal mode: render user message + assistant bubble immediately ───────────
   var userMsg = { id: genId(), role: 'user', content: text, ts: Date.now() };
   S.activeSession.messages.push(userMsg);
   var userIdx = S.activeSession.messages.length - 1;
   messagesEl.appendChild(buildMessageEl(userMsg, userIdx));
   scrollToBottom();
 
-  // Generate title from first message if this is the first message
-  if (S.activeSession.messages.length === 2 && !S.activeSession.name) {
-    // First message just sent - generate a short title
-    var shortTitle = text.slice(0, 40).trim().replace(/[^a-zA-Z0-9 ]/g, '');
-    S.activeSession.name = shortTitle || 'New Chat';
-    saveSession(S.activeSession);
-  }
-
-  // Build API history with context-injected version of the last message
-  var apiMsgs = buildApiMessages();
-  apiMsgs[apiMsgs.length - 1] = { role: 'user', content: apiContent };
-
-  // Assistant bubble
+  // Assistant bubble — visible immediately while context/embedding resolves
   var asstIdx  = S.activeSession.messages.length; // will be pushed on DONE
   var asstMsgEl = document.createElement('div');
   asstMsgEl.className = 'message assistant';
@@ -1019,7 +1696,6 @@ function doSendChat(text) {
   var body = document.createElement('div');
   body.className = 'msg-body';
 
-  // Thinking block (hidden until content arrives)
   var thinkBlock = document.createElement('details');
   thinkBlock.className = 'think-block hidden';
   var thinkSum = document.createElement('summary');
@@ -1047,23 +1723,40 @@ function doSendChat(text) {
     mainText:     '',
     inThinkTag:   false,
     metrics:      null,
-    sources:      ctx ? ctx.names : null,
+    sources:      null, // filled in once context resolves
     msgIndex:     asstIdx,
     msgEl:        asstMsgEl,
     bodyEl:       body
   };
 
-  chrome.runtime.sendMessage({
-    action:    'OLLAMA_FETCH',
-    url:       S.settings.url + '/api/chat',
-    headers:   getHeaders(),
-    body:      JSON.stringify({
-      model:    model,
-      messages: apiMsgs,
-      stream:   true,
-      options:  getModelOptions()
-    }),
-    requestId: requestId
+  // Build context (may call embedding API) — API fetch fires when ready
+  buildContextBlock(text, function (ctx) {
+    dbg('INFO', 'doSendChat step', { step: 'context-resolved', ms: Date.now() - _t0, hasCtx: !!ctx });
+    if (S.currentStream) S.currentStream.sources = ctx ? ctx.names : null;
+
+    var apiContent = ctx ? ctx.text + '\n\n' + text : text;
+    var apiMsgs = buildApiMessages();
+    var lastMsg = { role: 'user', content: apiContent };
+    if (imageAttachments.length) {
+      dbg('OLLAMA', 'sending message with images', { imageCount: imageAttachments.length, model: S.activeSession.model });
+      lastMsg.images = imageAttachments.map(function (a) { return a.content; });
+    }
+    apiMsgs[apiMsgs.length - 1] = lastMsg;
+
+    dbg('OLLAMA', 'request', { action: 'OLLAMA_FETCH', url: S.settings.url + '/api/chat', model: model, msFromStart: Date.now() - _t0 });
+    dbg('INFO', 'doSendChat step', { step: 'before-fetch', ms: Date.now() - _t0 });
+    chrome.runtime.sendMessage({
+      action:    'OLLAMA_FETCH',
+      url:       S.settings.url + '/api/chat',
+      headers:   getHeaders(),
+      body:      JSON.stringify({
+        model:    model,
+        messages: apiMsgs,
+        stream:   true,
+        options:  getModelOptions()
+      }),
+      requestId: requestId
+    });
   });
 }
 
@@ -1183,6 +1876,7 @@ chrome.runtime.onMessage.addListener(function (msg) {
   }
 
   if (msg.action === 'STREAM_DONE' || msg.action === 'STREAM_ERROR') {
+    dbg('STREAM', msg.action, { requestId: msg.requestId, aborted: msg.aborted, error: msg.error });
     var isErr  = msg.action === 'STREAM_ERROR';
     var content = cs.mainText;
 
@@ -1250,6 +1944,10 @@ chrome.runtime.onMessage.addListener(function (msg) {
         cs.msgEl.dataset.index = S.activeSession.messages.length - 1;
         saveSession(S.activeSession);
         updateRegenButton();
+        updateCtxBar();
+        if (S.activeSession.messages.length === 2 && S.activeSession.name === 'New Chat') {
+          generateSessionTitle(S.activeSession.messages[0].content);
+        }
       }
     }
 
@@ -1263,16 +1961,80 @@ chrome.runtime.onMessage.addListener(function (msg) {
 
 // ── Event handlers ────────────────────────────────────────────────────────────
 
+function armConfirm(btn, label, cb) {
+  var orig = btn.innerHTML;
+  var origClass = btn.className;
+  btn.innerHTML = label || 'Sure?';
+  btn.className = btn.className.replace('danger','') + ' danger';
+  btn.style.opacity = '1';
+  var t = setTimeout(function () { reset(); }, 2500);
+  function reset() {
+    clearTimeout(t);
+    btn.innerHTML = orig;
+    btn.className = origClass;
+    btn.style.opacity = '';
+    btn.onclick = null;
+  }
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    reset();
+    cb();
+  };
+}
+
+function toggleHelp() {
+  helpOverlay.classList.toggle('hidden');
+  dbg('CLICK', 'help overlay toggled', { open: !helpOverlay.classList.contains('hidden') });
+}
+
 function initEventHandlers() {
+
+  // Status dot stats panel
+  var statsPanel = document.getElementById('stats-panel');
+  statusDot.style.cursor = 'pointer';
+  statusDot.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (!statsPanel.classList.contains('hidden')) {
+      statsPanel.classList.add('hidden'); return;
+    }
+    statsPanel.innerHTML = '<div style="color:var(--fg3)">Loading…</div>';
+    statsPanel.classList.remove('hidden');
+    var base = S.settings.url;
+    var hdrs = getHeaders();
+    var done = 0;
+    var ps, ver;
+    function tryRender() {
+      if (++done < 2) return;
+      var lines = [];
+      if (ver) lines.push('<div class="stats-line"><span>Version</span><span class="stats-val">' + escapeHtml(ver) + '</span></div>');
+      if (ps && ps.models && ps.models.length) {
+        ps.models.forEach(function(m) {
+          lines.push('<div class="stats-line"><span>' + escapeHtml(m.name) + '</span><span class="stats-val">loaded</span></div>');
+        });
+      } else {
+        lines.push('<div class="stats-line"><span>No models loaded</span></div>');
+      }
+      statsPanel.innerHTML = lines.join('');
+    }
+    chrome.runtime.sendMessage({ action: 'OLLAMA_GET', url: base + '/api/version', headers: hdrs }, function(r) {
+      if (r && r.ok && r.data) ver = r.data.version;
+      tryRender();
+    });
+    chrome.runtime.sendMessage({ action: 'OLLAMA_GET', url: base + '/api/ps', headers: hdrs }, function(r) {
+      if (r && r.ok && r.data) ps = r.data;
+      tryRender();
+    });
+  });
+  document.addEventListener('click', function() { statsPanel.classList.add('hidden'); });
 
   // Header
   btnSettings.addEventListener('click', function () {
-    var wasOpen = !settingsPanel.classList.contains('hidden');
-    closePanels();
-    if (!wasOpen) { settingsPanel.classList.remove('hidden'); btnSettings.classList.add('active'); }
+    dbg('CLICK', 'btn-settings');
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
   });
 
   btnSessions.addEventListener('click', function () {
+    dbg('CLICK', 'btn-sessions');
     var wasOpen = !sessionsPanel.classList.contains('hidden');
     closePanels();
     if (!wasOpen) {
@@ -1282,124 +2044,91 @@ function initEventHandlers() {
     }
   });
 
-  btnTheme.addEventListener('click', function () {
-    applyTheme(S.theme === 'dark' ? 'light' : 'dark');
+  document.getElementById('btn-help').addEventListener('click', toggleHelp);
+  document.getElementById('btn-help-close').addEventListener('click', function () {
+    helpOverlay.classList.add('hidden');
+  });
+  helpOverlay.addEventListener('click', function (e) {
+    if (e.target === helpOverlay) helpOverlay.classList.add('hidden');
   });
 
-  // Settings
-  btnShowToken.addEventListener('click', function () {
-    inputToken.type = inputToken.type === 'password' ? 'text' : 'password';
+  chatArea.addEventListener('scroll', function () {
+    var atBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 40;
+    if (atBottom && !S.autoScroll) {
+      S.autoScroll = true;
+      dbg('INFO', 'auto-scroll re-enabled — user scrolled to bottom');
+    }
   });
 
-  var urlTimer = null;
-  inputUrl.addEventListener('input', function () {
-    clearTimeout(urlTimer);
-    var val = this.value.trim().replace(/\/+$/, '');
-    if (!val || !/^https?:\/\//.test(val)) return;
-    urlTimer = setTimeout(function () {
-      setStatus('', 'Checking…');
-      var lh = { 'Content-Type': 'application/json' };
-      var tok = inputToken.value.trim();
-      if (tok) lh['Authorization'] = 'Bearer ' + tok;
-      chrome.runtime.sendMessage(
-        { action: 'OLLAMA_GET', url: val + '/api/tags', headers: lh },
-        function (r) {
-          if (!r || !r.ok) { setStatus('error', 'Cannot connect'); return; }
-          setStatus('connected', 'Connected');
-          var models = (r.data.models || []).map(function (m) {
-            return { name: m.name, paramSize: (m.details && m.details.parameter_size) || '', sizeLabel: m.size ? formatBytes(m.size) : '' };
-          });
-          S.models = models;
-          populateModels();
-        }
-      );
-    }, 800);
+  chatArea.addEventListener('wheel', function (e) {
+    if (e.deltaY < 0 && S.isStreaming) {
+      S.autoScroll = false;
+      dbg('INFO', 'auto-scroll disabled — user scrolled up during stream');
+    }
   });
 
-  btnSave.addEventListener('click', async function () {
-    saveSettings();
-    setSettingsStatus('Connecting…', '');
-    await fetchModels();
+  var btnCompact = document.getElementById('btn-compact');
+  btnCompact.classList.toggle('active', S.compact);
+  btnCompact.addEventListener('click', function () {
+    applyCompact(!S.compact);
+    btnCompact.classList.toggle('active', S.compact);
+  });
+
+  modelSelect.addEventListener('change', function() {
+    dbg('MODEL', 'model changed', { model: this.value });
+    if (!S.activeSession) return;
+    S.activeSession.model = this.value;
+    debouncedSaveSession();
   });
 
   // Sessions panel
-  btnNewSession.addEventListener('click', newSession);
+  btnNewSession.addEventListener('click', function () {
+    dbg('CLICK', 'btn-new-session');
+    newSession();
+  });
+
+  sessionSearch.addEventListener('input', function () {
+    filterSessions(this.value);
+  });
 
   sessionsList.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-action]');
     if (!btn) return;
     var id = btn.dataset.id;
     if (btn.dataset.action === 'rename') renameSession(id);
-    if (btn.dataset.action === 'delete') deleteSession(id);
+    if (btn.dataset.action === 'delete') {
+      armConfirm(btn, '✕?', function () { deleteSession(id); });
+    }
   });
 
   // Session bar
-  btnRenameSession.addEventListener('click', function () {
-    if (S.activeSession) renameSession(S.activeSession.id);
+  btnExportSession.addEventListener('click', function () {
+    dbg('CLICK', 'btn-export-session');
+    exportSession(S.activeSession);
   });
-  btnExportSession.addEventListener('click', function () { exportSession(S.activeSession); });
+  btnExportClose.addEventListener('click', function () {
+    exportOverlay.classList.add('hidden');
+  });
+  exportOverlay.addEventListener('click', function (e) {
+    if (e.target === exportOverlay) exportOverlay.classList.add('hidden');
+  });
+  btnExportCopy.addEventListener('click', function () {
+    navigator.clipboard.writeText(exportContent.textContent).then(function () {
+      btnExportCopy.textContent = 'Copied ✓';
+      setTimeout(function () { btnExportCopy.textContent = 'Copy'; }, 1800);
+    }).catch(function () {
+      exportContent.select && exportContent.select();
+    });
+  });
   btnDeleteSession.addEventListener('click', function () {
-    if (S.activeSession) deleteSession(S.activeSession.id);
+    dbg('CLICK', 'btn-delete-session');
+    if (!S.activeSession) return;
+    armConfirm(btnDeleteSession, '✕ Sure?', function () {
+      deleteSession(S.activeSession.id);
+    });
   });
   sessionNameEl.addEventListener('dblclick', function () {
     if (S.activeSession) renameSession(S.activeSession.id);
-  });
-
-  // Model selector (in settings panel)
-  selectModel.addEventListener('change', function () {
-    if (!S.activeSession) return;
-    S.activeSession.model = this.value;
-    updateModelDisplay();
-    debouncedSaveSession();
-    renderParamsPanel();
-  });
-
-  // System prompt (now in settings panel, but also accessible from input area as reminder)
-  btnToggleSystem.addEventListener('click', function () {
-    // Toggle visibility in input area (for quick editing)
-    var open = systemPanel.classList.toggle('hidden') === false;
-    btnToggleSystem.classList.toggle('active', !systemPanel.classList.contains('hidden'));
-    if (open) inputSysPrompt.focus();
-  });
-  btnCloseSystem.addEventListener('click', function () {
-    systemPanel.classList.add('hidden');
-    btnToggleSystem.classList.remove('active');
-  });
-  inputSysPrompt.addEventListener('input', function () {
-    if (!S.activeSession) return;
-    S.activeSession.systemPrompt = this.value;
-    debouncedSaveSession();
-  });
-
-  // Settings panel system prompt
-  var settingsSysPanel = document.getElementById('system-prompt-panel');
-  if (settingsSysPanel) {
-    var settingsBtnCloseSystem = settingsSysPanel.querySelector('#btn-close-system');
-    if (settingsBtnCloseSystem) {
-      settingsBtnCloseSystem.addEventListener('click', function () {
-        settingsSysPanel.classList.add('collapsed');
-      });
-    }
-    var settingsInputSysPrompt = settingsSysPanel.querySelector('#input-system-prompt');
-    if (settingsInputSysPrompt) {
-      settingsInputSysPrompt.addEventListener('input', function () {
-        if (!S.activeSession) return;
-        S.activeSession.systemPrompt = this.value;
-        debouncedSaveSession();
-      });
-    }
-  }
-
-  // Params panel
-  btnToggleParams.addEventListener('click', function () {
-    var open = !paramsPanel.classList.contains('hidden');
-    paramsPanel.classList.toggle('hidden', open);
-    btnToggleParams.classList.toggle('active', !open);
-    if (!open) renderParamsPanel();
-  });
-  btnCloseParams.addEventListener('click', function () {
-    paramsPanel.classList.add('hidden');
-    btnToggleParams.classList.remove('active');
   });
 
   // File chips (delegation)
@@ -1410,19 +2139,102 @@ function initEventHandlers() {
     removeAttachment(idx);
   });
 
-  // File attach
-  btnAttachFile.addEventListener('click', function () { fileInput.click(); });
-  fileInput.addEventListener('change', function () { if (this.files.length) handleFiles(this.files); });
+  // Drag and drop — full-app drop target with overlay
+  var dragOverlay = document.getElementById('drag-overlay');
+  var dragCounter = 0;
+
+  app.addEventListener('dragenter', function (e) {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dragCounter++;
+    dbg('FILE', 'drag enter', { counter: dragCounter });
+    dragOverlay.classList.remove('hidden');
+  });
+
+  app.addEventListener('dragleave', function (e) {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      dragOverlay.classList.add('hidden');
+    }
+  });
+
+  app.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  app.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dragCounter = 0;
+    dragOverlay.classList.add('hidden');
+    var files = Array.from(e.dataTransfer.files);
+    dbg('FILE', 'files dropped', { count: files.length, names: files.map(function(f){ return f.name; }) });
+    var images = files.filter(function (f) { return f.type.startsWith('image/'); });
+    var docs   = files.filter(function (f) { return !f.type.startsWith('image/'); });
+    if (images.length && docs.length) {
+      dbg('FILE', 'mixed drop — images and documents', { images: images.length, docs: docs.length });
+    }
+    if (images.length) handleImages(images);
+    if (docs.length)   handleFiles(docs);
+  });
+
+  document.getElementById('btn-attach-file').addEventListener('click', function () {
+    dbg('FILE', 'attach button clicked', {
+      showOpenFilePicker: typeof window.showOpenFilePicker !== 'undefined'
+    });
+
+    if (typeof window.showOpenFilePicker !== 'undefined') {
+      // Chrome path — native file picker
+      window.showOpenFilePicker({
+        multiple: true,
+        types: [
+          {
+            description: 'Text & data files',
+            accept: {
+              'text/plain':       ['.txt', '.md'],
+              'text/csv':         ['.csv'],
+              'application/pdf':  ['.pdf']
+            }
+          },
+          {
+            description: 'Images',
+            accept: {
+              'image/jpeg': ['.jpg', '.jpeg'],
+              'image/png':  ['.png'],
+              'image/webp': ['.webp'],
+              'image/gif':  ['.gif']
+            }
+          }
+        ]
+      }).then(function (handles) {
+        dbg('FILE', 'showOpenFilePicker returned', { count: handles.length });
+        return Promise.all(handles.map(function (h) { return h.getFile(); }));
+      }).then(function (files) {
+        var images = files.filter(function (f) { return f.type.startsWith('image/'); });
+        var docs   = files.filter(function (f) { return !f.type.startsWith('image/'); });
+        if (images.length) handleImages(images);
+        if (docs.length)   handleFiles(docs);
+      }).catch(function (e) {
+        if (e.name !== 'AbortError') {
+          dbg('ERROR', 'showOpenFilePicker failed', { error: e.message });
+          appendSystemMsg('Could not open file picker: ' + e.message);
+        } else {
+          dbg('FILE', 'file picker cancelled by user');
+        }
+      });
+
+    } else {
+      // Orion path — picker not available, remind user to drag and drop
+      dbg('FILE', 'attach button clicked — showOpenFilePicker unavailable, drag and drop required');
+      appendSystemMsg('File picker unavailable in this browser. Drag and drop files directly onto the chat.');
+    }
+  });
 
   // Page context
-  btnPageContext.addEventListener('click', togglePageContext);
-
-  // Clear
-  btnClear.addEventListener('click', function () {
-    if (S.isStreaming) return;
-    if (!confirm('Clear this conversation?')) return;
-    if (S.activeSession) { S.activeSession.messages = []; saveSession(S.activeSession); }
-    renderAllMessages();
+  btnPageContext.addEventListener('click', function () {
+    dbg('CLICK', 'btn-page-context');
+    togglePageContext();
   });
 
   // Textarea input & template dropdown
@@ -1447,6 +2259,7 @@ function initEventHandlers() {
 
   // Templates button (open manager)
   btnTemplatesOpen.addEventListener('click', function () {
+    dbg('CLICK', 'btn-templates-open');
     renderTmplOverlay();
     tmplOverlay.classList.remove('hidden');
   });
@@ -1476,14 +2289,51 @@ function initEventHandlers() {
     var btn = e.target.closest('.tmpl-item-del');
     if (!btn) return;
     var id = btn.dataset.id;
-    S.templates = S.templates.filter(function (t) { return t.id !== id; });
+    S.templates = S.templates.filter(function (t) { return t.id !== id || t.builtin; });
     saveTemplates();
     renderTmplOverlay();
   });
 
-  // Send / Stop
-  btnSend.addEventListener('click', sendChat);
-  btnStop.addEventListener('click', stopStream);
+  // Compare toggle
+  btnCompare.addEventListener('click', function () {
+    dbg('CLICK', 'btn-compare');
+    toggleCompare();
+  });
+
+  modelSelectB.addEventListener('change', function () {
+    dbg('MODEL', 'model-select-b changed', { model: this.value });
+  });
+
+  // Persona button
+  document.getElementById('btn-persona').addEventListener('click', function () {
+    dbg('CLICK', 'btn-persona');
+    renderPersonaOverlay();
+    personaOverlay.classList.remove('hidden');
+  });
+
+  // Persona overlay
+  btnPersonaOverlayClose.addEventListener('click', function () {
+    personaOverlay.classList.add('hidden');
+  });
+  personaOverlay.addEventListener('click', function (e) {
+    if (e.target === personaOverlay) personaOverlay.classList.add('hidden');
+  });
+  btnPersonaAdd.addEventListener('click', function () {
+    var name   = personaNewName.value.trim();
+    var prompt = personaNewPrompt.value.trim();
+    if (!name || !prompt) return;
+    S.personas.push({ id: genId(), name: name, prompt: prompt });
+    savePersonas();
+    personaNewName.value = ''; personaNewPrompt.value = '';
+    renderPersonaOverlay();
+  });
+
+  // Send (also acts as stop during streaming via onclick set in setSendEnabled)
+  btnSend.addEventListener('click', function () {
+    if (S.isStreaming) return; // handled by the onclick set in setSendEnabled
+    dbg('CLICK', 'btn-send');
+    sendChat();
+  });
 
   // Message actions (delegation)
   messagesEl.addEventListener('click', function (e) {
@@ -1510,26 +2360,114 @@ function initEventHandlers() {
     if (action === 'edit')  { startEditMessage(msgEl, index); }
     if (action === 'regen') { regenerateLastResponse(); }
   });
+
+  document.addEventListener('keydown', function(e) {
+    var tag = document.activeElement && document.activeElement.tagName;
+    var inField = (tag === 'TEXTAREA' || tag === 'INPUT');
+
+    if (e.key === 'Escape') {
+      templateDropdown.classList.add('hidden');
+      tmplOverlay.classList.add('hidden');
+      personaOverlay.classList.add('hidden');
+      exportOverlay.classList.add('hidden');
+      helpOverlay.classList.add('hidden');
+      closePanels();
+      return;
+    }
+    if (inField) return;
+
+    if (e.ctrlKey && e.key === 'k') {
+      e.preventDefault();
+      newSession();
+    }
+    if (e.ctrlKey && e.key === 'l') {
+      e.preventDefault();
+      if (S.isStreaming) return;
+      if (_ctrlLPending) {
+        clearTimeout(_ctrlLTimer);
+        _ctrlLPending = false;
+        var toast = document.getElementById('ctrl-l-toast');
+        if (toast) toast.remove();
+        if (S.activeSession) { S.activeSession.messages = []; saveSession(S.activeSession); }
+        renderAllMessages();
+        dbg('CLICK', 'Ctrl+L clear confirmed');
+      } else {
+        _ctrlLPending = true;
+        dbg('CLICK', 'Ctrl+L clear — awaiting confirmation');
+        var t = document.createElement('div');
+        t.id = 'ctrl-l-toast';
+        t.className = 'ctrlL-toast';
+        t.textContent = 'Press Ctrl+L again to clear conversation';
+        var dismiss = document.createElement('button');
+        dismiss.className = 'sys-msg-dismiss';
+        dismiss.innerHTML = '&#10005;';
+        dismiss.addEventListener('click', function () {
+          clearTimeout(_ctrlLTimer);
+          _ctrlLPending = false;
+          t.remove();
+        });
+        t.appendChild(dismiss);
+        messagesEl.appendChild(t);
+        scrollToBottom();
+        _ctrlLTimer = setTimeout(function () {
+          _ctrlLPending = false;
+          if (t.parentNode) t.remove();
+        }, 3000);
+      }
+    }
+    if (e.ctrlKey && e.key === '/') {
+      e.preventDefault();
+      renderTmplOverlay();
+      tmplOverlay.classList.remove('hidden');
+    }
+    if (e.ctrlKey && e.key === ',') {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+    }
+    if (e.ctrlKey && e.key === '?') {
+      e.preventDefault();
+      toggleHelp();
+    }
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 loadAllData(async function () {
+  dbg('INFO', 'sidepanel init', {
+    browser:    navigator.userAgent,
+    url:        S.settings.url,
+    theme:      S.theme,
+    sessions:   S.sessions.length,
+    showOpenFilePicker: typeof window.showOpenFilePicker !== 'undefined'
+  });
   renderSession();
   initEventHandlers();
-  renderParamsPanel();
   await fetchModels();
-  // After models load, sync session model to selector
-  if (S.activeSession && S.activeSession.model) {
-    selectModel.value = S.activeSession.model;
-    if (!selectModel.value) {
-      // model stored in session not in list; pick first
-      if (selectModel.options.length > 1) {
-        selectModel.selectedIndex = 1;
-        S.activeSession.model = selectModel.value;
-      }
-    }
+  populateModels();
+});
+
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area !== 'local') return;
+  var reconnect = false;
+  if (changes.ollamaSidebarUrl)   { S.settings.url   = changes.ollamaSidebarUrl.newValue   || 'http://localhost:11434'; reconnect = true; }
+  if (changes.ollamaSidebarToken) { S.settings.token  = changes.ollamaSidebarToken.newValue || ''; reconnect = true; }
+  if (changes.ollamaSidebarTheme) applyTheme(changes.ollamaSidebarTheme.newValue || 'dark');
+  if (changes.ollamaSidebarParams) S.storedParams = changes.ollamaSidebarParams.newValue || {};
+  if (changes.ollamaSidebarDefaultModel) { S.defaultModel = changes.ollamaSidebarDefaultModel.newValue || ''; }
+  if (changes.ollamaSidebarSystemPrompt) { S.defaultSystemPrompt = changes.ollamaSidebarSystemPrompt.newValue || ''; }
+  if (changes.ollamaSidebarLanguage) {
+    S.language = changes.ollamaSidebarLanguage.newValue || '';
+    dbg('INFO', 'language lock updated', { language: S.language });
   }
+  if (changes.ollamaSidebarEmbedModel) S.embedModel = changes.ollamaSidebarEmbedModel.newValue || '';
+  if (changes.ollamaSidebarAutoScroll !== undefined) S.autoScroll = changes.ollamaSidebarAutoScroll.newValue !== false;
+  if (changes.ollamaSidebarCompact) {
+    applyCompact(changes.ollamaSidebarCompact.newValue || false);
+    var btnCompact = document.getElementById('btn-compact');
+    if (btnCompact) btnCompact.classList.toggle('active', S.compact);
+  }
+  if (reconnect) fetchModels().then(populateModels);
 });
 
 })();

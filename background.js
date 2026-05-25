@@ -33,6 +33,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleGetPageContent(message.tabId, sendResponse);
     return true;
   }
+  if (message.action === 'OLLAMA_FETCH_JSON') {
+    handleFetchJson(message, sendResponse);
+    return true;
+  }
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,6 +55,23 @@ function handleGetPageContent(tabId, sendResponse) {
     }
     sendResponse(response || { error: 'Content script did not respond' });
   });
+}
+
+// ── Non-streaming JSON POST ───────────────────────────────────────────────────
+
+async function handleFetchJson(message, sendResponse) {
+  try {
+    const res = await fetch(message.url, {
+      method: 'POST',
+      headers: message.headers || {},
+      body: message.body
+    });
+    if (!res.ok) { sendResponse({ ok: false, error: 'HTTP ' + res.status }); return; }
+    const data = await res.json();
+    sendResponse({ ok: true, data });
+  } catch (e) {
+    sendResponse({ ok: false, error: e.message });
+  }
 }
 
 // ── Non-streaming GET ─────────────────────────────────────────────────────────

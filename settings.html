@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ollama Sidebar — Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div id="app" data-theme="dark">
+
+  <header>
+    <h1>Ollama Sidebar</h1>
+    <p class="subtitle">Settings</p>
+  </header>
+
+  <main>
+
+    <!-- ── Connection ──────────────────────────────────────────── -->
+    <section>
+      <h2>Connection</h2>
+
+      <div class="field-group">
+        <label for="input-url">Ollama Base URL</label>
+        <input type="text" id="input-url" placeholder="http://localhost:11434" spellcheck="false">
+      </div>
+
+      <div class="field-group">
+        <label for="input-token">Bearer Token <span class="hint">(optional)</span></label>
+        <div class="input-row">
+          <input type="password" id="input-token" placeholder="Leave empty if not required" spellcheck="false">
+          <button id="btn-show-token" class="icon-btn" title="Show / hide token">&#9900;</button>
+        </div>
+      </div>
+
+      <div class="field-actions">
+        <button id="btn-test" class="secondary-btn">Test Connection</button>
+        <span id="test-status" class="status-text"></span>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── Models ──────────────────────────────────────────────── -->
+    <section>
+      <h2>Models</h2>
+
+      <div class="field-group">
+        <label for="select-title-model">Title Generation Model</label>
+        <select id="select-title-model">
+          <option value="">— select model —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label for="select-default-model">Default Chat Model</label>
+        <select id="select-default-model">
+          <option value="">— select model —</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label for="select-embed-model">Embedding Model <span class="hint">(for semantic search — nomic-embed-text-v2-moe recommended)</span></label>
+        <select id="select-embed-model">
+          <option value="">— disable semantic RAG —</option>
+        </select>
+      </div>
+
+      <h3>Pull a Model</h3>
+      <div class="field-group">
+        <label for="pull-model-input">Model name</label>
+        <div class="input-row">
+          <input type="text" id="pull-model-input" placeholder="e.g. llama3:8b, qwen3:8b" spellcheck="false">
+          <button id="btn-pull" class="icon-btn" title="Pull model">&#8659;</button>
+        </div>
+      </div>
+      <div id="pull-progress" class="pull-progress hidden"></div>
+    </section>
+
+    <hr>
+
+    <!-- ── Chat Defaults ───────────────────────────────────────── -->
+    <section>
+      <h2>Chat Defaults</h2>
+
+      <div class="field-group">
+        <label for="input-system-prompt">System Prompt</label>
+        <textarea id="input-system-prompt" rows="4" spellcheck="true"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label for="input-language">Response Language <span class="hint">(optional — leave blank for model default)</span></label>
+        <input type="text" id="input-language" placeholder="e.g. English, Spanish, French…" spellcheck="false">
+      </div>
+
+      <h3>Model Parameters</h3>
+      <div id="params-grid" class="params-grid"></div>
+    </section>
+
+    <hr>
+
+    <!-- ── Appearance ──────────────────────────────────────────── -->
+    <section>
+      <h2>Appearance</h2>
+
+      <div class="field-group inline">
+        <label>Theme</label>
+        <div class="toggle-row">
+          <button id="btn-theme-dark"  class="theme-btn" data-theme="dark">Dark</button>
+          <button id="btn-theme-light" class="theme-btn" data-theme="light">Light</button>
+        </div>
+      </div>
+
+      <div class="field-group inline">
+        <label>Auto-scroll during generation</label>
+        <div class="toggle-row">
+          <button id="btn-autoscroll-on"  class="theme-btn" data-val="true">On</button>
+          <button id="btn-autoscroll-off" class="theme-btn" data-val="false">Off</button>
+        </div>
+      </div>
+
+      <div class="field-group inline">
+        <label>Compact message density</label>
+        <div class="toggle-row">
+          <button id="btn-compact-on"  class="theme-btn" data-val="true">On</button>
+          <button id="btn-compact-off" class="theme-btn" data-val="false">Off</button>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <div class="save-row">
+      <button id="btn-save" class="primary-btn">Save Settings</button>
+      <span id="save-status" class="status-text ok hidden">Saved ✓</span>
+    </div>
+
+    <section id="debug-section">
+      <details id="debug-details">
+        <summary class="debug-summary">
+          <span>Debug</span>
+          <span class="debug-summary-chevron">▶</span>
+        </summary>
+        <div class="debug-body">
+          <div id="debug-sysinfo" class="debug-sysinfo"></div>
+          <div class="field-actions" style="margin-bottom:12px;">
+            <button id="btn-debug-clear"  class="secondary-btn">Clear Log</button>
+            <button id="btn-debug-export" class="secondary-btn">Copy Log</button>
+            <span id="debug-log-count" class="status-text"></span>
+            <span id="debug-autoclear" class="status-text debug-autoclear"></span>
+          </div>
+          <div id="debug-log" class="debug-log"></div>
+        </div>
+      </details>
+    </section>
+
+  </main>
+</div>
+<script src="settings.js"></script>
+</body>
+</html>

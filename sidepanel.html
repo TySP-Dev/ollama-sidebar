@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ollama Sidebar</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="hljs-github-dark.min.css">
+  <script src="marked.min.js"></script>
+  <script src="highlight.min.js"></script>
 </head>
 <body>
 <div id="app" data-theme="dark">
@@ -12,59 +15,19 @@
   <!-- ── Header ─────────────────────────────────────────────── -->
   <header>
     <div class="h-left">
-      <button id="btn-sessions" class="icon-btn" title="Conversations">&#9776;</button>
+      <button id="btn-sessions" class="icon-btn" title="Chat history">&#128172;</button>
       <span class="app-title">Ollama</span>
-      <span id="status-dot" class="status-dot" title="Checking…"></span>
     </div>
     <div class="h-right">
-      <button id="btn-theme"    class="icon-btn" title="Toggle theme">&#9680;</button>
+      <div class="status-wrap">
+        <span id="status-dot" class="status-dot" title="Checking…"></span>
+        <div id="stats-panel" class="stats-panel hidden"></div>
+      </div>
+      <button id="btn-compact"    class="icon-btn" title="Compact mode">&#8801;</button>
+      <button id="btn-help"     class="icon-btn" title="Keyboard shortcuts (Ctrl+?)">?</button>
       <button id="btn-settings" class="icon-btn" title="Settings">&#9881;</button>
     </div>
   </header>
-
-  <!-- ── Settings panel ─────────────────────────────────────── -->
-  <div id="settings-panel" class="drop-panel hidden">
-    <div class="field-group">
-      <label class="field-lbl">Ollama URL</label>
-      <input type="text" id="input-url" placeholder="http://localhost:11434" spellcheck="false">
-    </div>
-    <div class="field-group">
-      <label class="field-lbl">Bearer Token <span class="hint">(optional)</span></label>
-      <div class="input-row-inline">
-        <input type="password" id="input-token" placeholder="Leave empty if not required" spellcheck="false">
-        <button id="btn-show-token" class="icon-btn sm" title="Show/hide">&#9900;</button>
-      </div>
-    </div>
-    <button id="btn-save" class="primary-btn">Save &amp; Connect</button>
-    <div id="settings-status" class="status-line"></div>
-
-    <!-- System prompt -->
-    <div id="system-prompt-panel" class="collapsible">
-      <div class="coll-hdr">
-        <span>System Prompt</span>
-        <button id="btn-close-system" class="icon-btn sm">&#10005;</button>
-      </div>
-      <textarea id="input-system-prompt"
-        placeholder="Instructions for the model this session…"
-        rows="3"
-        spellcheck="true"></textarea>
-    </div>
-
-    <!-- Model parameters -->
-    <div id="params-panel" class="collapsible">
-      <div class="coll-hdr">
-        <span>Parameters</span>
-        <button id="btn-close-params" class="icon-btn sm">&#10005;</button>
-      </div>
-      <div id="params-grid" class="params-grid"></div>
-    </div>
-
-    <!-- Model selector -->
-    <div class="field-group">
-      <label class="field-lbl">Model</label>
-      <select id="select-model"></select>
-    </div>
-  </div>
 
   <!-- ── Sessions panel ─────────────────────────────────────── -->
   <div id="sessions-panel" class="drop-panel hidden">
@@ -72,16 +35,19 @@
       <span class="panel-title">Conversations</span>
       <button id="btn-new-session" class="pill-btn">+ New</button>
     </div>
+    <input type="text" id="session-search" class="session-search" placeholder="Search conversations…" spellcheck="false">
     <div id="sessions-list" class="sessions-list"></div>
   </div>
 
   <!-- ── Session bar ─────────────────────────────────────────── -->
   <div class="session-bar">
-    <span id="session-name-display" class="session-name" title="Click to rename" id="session-name-display"></span>
+    <span id="session-name-display" class="session-name" title="Double-click to rename"></span>
     <div class="session-bar-actions">
-      <button id="btn-rename-session" class="icon-btn sm" title="Rename">&#9998;</button>
-      <button id="btn-export-session" class="icon-btn sm" title="Export as Markdown">&#8659;</button>
-      <button id="btn-delete-session" class="icon-btn sm danger" title="Delete session">&#10005;</button>
+      <select id="model-select"   class="model-select-bar" title="Active model"></select>
+      <select id="model-select-b" class="model-select-bar hidden" title="Second model (compare)"></select>
+      <button id="btn-persona" class="icon-btn sm" title="Switch persona">&#127917;</button>
+      <button id="btn-export-session" class="icon-btn sm" title="Export chat as Markdown">&#128229;</button>
+      <button id="btn-delete-session" class="icon-btn sm danger" title="Delete chat">&#128465;</button>
     </div>
   </div>
 
@@ -93,35 +59,27 @@
   <!-- ── Input area ──────────────────────────────────────────── -->
   <div class="input-area">
 
-    <!-- File chips -->
+    <!-- Row 1: Context chips (shown when active) -->
     <div id="file-chips-area" class="file-chips-area hidden">
       <div id="file-chips" class="file-chips"></div>
     </div>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
-      <button id="btn-page-context" class="toolbar-btn" title="Toggle page context">
-        <span class="tbi">&#9634;</span><span id="page-ctx-lbl">Page</span>
-      </button>
-      <button id="btn-attach-file" class="toolbar-btn" title="Attach file (.txt .md .pdf .csv)">
-        <span class="tbi">&#128206;</span>
-      </button>
-      <button id="btn-templates-open" class="toolbar-btn" title="Prompt templates">
-        <span class="tbi">/</span>
-      </button>
-      <div class="tb-spacer"></div>
-      <button id="btn-clear" class="toolbar-btn" title="Clear conversation">
-        <span class="tbi">&#10005;</span> Clear
-      </button>
+    <!-- Context window bar -->
+    <div id="ctx-bar-wrap" class="ctx-bar-wrap-full" title="Context window usage">
+      <span class="ctx-bar-label">Context</span>
+      <div class="ctx-bar-track">
+        <div id="ctx-bar" class="ctx-bar"></div>
+      </div>
+      <span id="ctx-bar-pct" class="ctx-bar-pct">0%</span>
     </div>
 
-    <!-- Message input -->
+    <!-- Row 2: Message textarea -->
     <textarea id="input-message"
-      placeholder="Type a message… (Enter to send, Shift+Enter for newline, / for templates)"
-      rows="3"
+      placeholder="Message… (Enter to send, Shift+Enter for newline, / for templates)"
+      rows="2"
       spellcheck="true"></textarea>
 
-    <!-- Template autocomplete dropdown (shown when / is typed) -->
+    <!-- Template autocomplete dropdown -->
     <div id="template-dropdown" class="tmpl-dropdown hidden">
       <div class="tmpl-dd-header">
         Templates
@@ -130,11 +88,22 @@
       <div id="tmpl-dd-list" class="tmpl-dd-list"></div>
     </div>
 
-    <!-- Send row -->
+    <!-- Row 3: Controls -->
     <div class="send-row">
-      <button id="btn-stop" class="stop-btn hidden" title="Stop generation">&#9632;</button>
-      <span id="model-display" class="model-display" title="Active model"></span>
-      <button id="btn-send" class="send-btn" title="Send (Enter)">&#9658;</button>
+      <button id="btn-compare" class="icon-btn sm compare-btn" title="Compare two models (select a second model to begin)">
+        <span class="tbi">&#8660;</span><span class="tbi" style="font-size:10px;">Compare</span>
+      </button>
+<button id="btn-templates-open" class="icon-btn sm" title="Prompt templates (/)">
+        <span class="tbi">/</span>
+      </button>
+      <button id="btn-page-context" class="icon-btn sm ctx-btn" title="Add current page as context">
+        <span class="tbi">&#127760;</span><span id="page-ctx-lbl">Add page</span>
+      </button>
+      <button id="btn-attach-file" class="icon-btn sm" title="Attach file or image">
+        <span class="tbi">&#128206;</span>
+      </button>
+      <div class="tb-spacer"></div>
+      <button id="btn-send" class="send-btn" title="Send message (Enter)">&#9658;</button>
     </div>
 
   </div><!-- /input-area -->
@@ -155,13 +124,84 @@
     </div>
   </div>
 
-  <!-- Hidden file input -->
-  <input type="file" id="file-input" accept=".txt,.md,.pdf,.csv" multiple hidden>
+  <!-- ── Persona manager overlay ────────────────────────────── -->
+  <div id="persona-overlay" class="overlay hidden">
+    <div class="overlay-panel">
+      <div class="overlay-hdr">
+        <span>Personas</span>
+        <button id="btn-persona-overlay-close" class="icon-btn">&#10005;</button>
+      </div>
+      <div id="persona-list" class="tmpl-list"></div>
+      <div class="tmpl-add-form">
+        <input  id="persona-new-name"   type="text"  placeholder="Persona name…" maxlength="60">
+        <textarea id="persona-new-prompt" placeholder="System prompt…" rows="4"></textarea>
+        <button id="btn-persona-add" class="primary-btn">Add Persona</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Export preview overlay ──────────────────────────────── -->
+  <div id="export-overlay" class="overlay hidden">
+    <div class="overlay-panel">
+      <div class="overlay-hdr">
+        <span id="export-overlay-title">Export</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="btn-export-copy" class="pill-btn">Copy</button>
+          <button id="btn-export-close" class="icon-btn">&#10005;</button>
+        </div>
+      </div>
+      <pre id="export-content" class="export-pre"></pre>
+    </div>
+  </div>
+
+
+  <!-- ── Drag and drop overlay ───────────────────────────────── -->
+  <div id="drag-overlay" class="drag-overlay hidden">
+    <div class="drag-overlay-inner">
+      <div class="drag-icon">&#128206;</div>
+      <div class="drag-label">Drop files to attach</div>
+      <div class="drag-sub">.txt · .md · .pdf · .csv · .jpg · .png · .webp</div>
+    </div>
+  </div>
+
+  <!-- ── Keyboard shortcuts overlay ──────────────────────────── -->
+  <div id="help-overlay" class="overlay hidden">
+    <div class="overlay-panel help-panel">
+      <div class="overlay-hdr">
+        <span>Keyboard Shortcuts</span>
+        <button id="btn-help-close" class="icon-btn">&#10005;</button>
+      </div>
+      <div class="help-body">
+        <div class="help-group">
+          <div class="help-group-label">Chat</div>
+          <div class="help-row"><kbd>Enter</kbd><span>Send message</span></div>
+          <div class="help-row"><kbd>Shift</kbd><kbd>Enter</kbd><span>New line</span></div>
+          <div class="help-row"><kbd>Ctrl</kbd><kbd>L</kbd><span>Clear conversation (press twice)</span></div>
+        </div>
+        <div class="help-group">
+          <div class="help-group-label">Navigation</div>
+          <div class="help-row"><kbd>Ctrl</kbd><kbd>K</kbd><span>New chat</span></div>
+          <div class="help-row"><kbd>Ctrl</kbd><kbd>,</kbd><span>Open settings</span></div>
+          <div class="help-row"><kbd>Ctrl</kbd><kbd>/</kbd><span>Open templates</span></div>
+          <div class="help-row"><kbd>Ctrl</kbd><kbd>?</kbd><span>Show this help</span></div>
+          <div class="help-row"><kbd>Esc</kbd><span>Close panels and dropdowns</span></div>
+        </div>
+        <div class="help-group">
+          <div class="help-group-label">Files</div>
+          <div class="help-row"><span class="help-drag">Drag &amp; drop</span><span>Attach files or images</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div><!-- /#app -->
-<!-- Markdown renderer -->
-<script src="marked.min.js"></script>
-<script src="highlight.min.js"></script>
+<script src="pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      chrome.runtime.getURL('pdf.worker.min.js');
+  }
+</script>
 <script src="sidepanel.js"></script>
 </body>
 </html>
