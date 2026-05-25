@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ollama Sidebar</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+<div id="app" data-theme="dark">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header>
+    <div class="h-left">
+      <button id="btn-sessions" class="icon-btn" title="Conversations">&#9776;</button>
+      <span class="app-title">Ollama</span>
+      <span id="status-dot" class="status-dot" title="Checking…"></span>
+    </div>
+    <div class="h-right">
+      <button id="btn-theme"    class="icon-btn" title="Toggle theme">&#9680;</button>
+      <button id="btn-settings" class="icon-btn" title="Settings">&#9881;</button>
+    </div>
+  </header>
+
+  <!-- ── Settings panel ─────────────────────────────────────── -->
+  <div id="settings-panel" class="drop-panel hidden">
+    <div class="field-group">
+      <label class="field-lbl">Ollama URL</label>
+      <input type="text" id="input-url" placeholder="http://localhost:11434" spellcheck="false">
+    </div>
+    <div class="field-group">
+      <label class="field-lbl">Bearer Token <span class="hint">(optional)</span></label>
+      <div class="input-row-inline">
+        <input type="password" id="input-token" placeholder="Leave empty if not required" spellcheck="false">
+        <button id="btn-show-token" class="icon-btn sm" title="Show/hide">&#9900;</button>
+      </div>
+    </div>
+    <button id="btn-save" class="primary-btn">Save &amp; Connect</button>
+    <div id="settings-status" class="status-line"></div>
+
+    <!-- System prompt -->
+    <div id="system-prompt-panel" class="collapsible">
+      <div class="coll-hdr">
+        <span>System Prompt</span>
+        <button id="btn-close-system" class="icon-btn sm">&#10005;</button>
+      </div>
+      <textarea id="input-system-prompt"
+        placeholder="Instructions for the model this session…"
+        rows="3"
+        spellcheck="true"></textarea>
+    </div>
+
+    <!-- Model parameters -->
+    <div id="params-panel" class="collapsible">
+      <div class="coll-hdr">
+        <span>Parameters</span>
+        <button id="btn-close-params" class="icon-btn sm">&#10005;</button>
+      </div>
+      <div id="params-grid" class="params-grid"></div>
+    </div>
+
+    <!-- Model selector -->
+    <div class="field-group">
+      <label class="field-lbl">Model</label>
+      <select id="select-model"></select>
+    </div>
+  </div>
+
+  <!-- ── Sessions panel ─────────────────────────────────────── -->
+  <div id="sessions-panel" class="drop-panel hidden">
+    <div class="panel-hdr">
+      <span class="panel-title">Conversations</span>
+      <button id="btn-new-session" class="pill-btn">+ New</button>
+    </div>
+    <div id="sessions-list" class="sessions-list"></div>
+  </div>
+
+  <!-- ── Session bar ─────────────────────────────────────────── -->
+  <div class="session-bar">
+    <span id="session-name-display" class="session-name" title="Click to rename" id="session-name-display"></span>
+    <div class="session-bar-actions">
+      <button id="btn-rename-session" class="icon-btn sm" title="Rename">&#9998;</button>
+      <button id="btn-export-session" class="icon-btn sm" title="Export as Markdown">&#8659;</button>
+      <button id="btn-delete-session" class="icon-btn sm danger" title="Delete session">&#10005;</button>
+    </div>
+  </div>
+
+  <!-- ── Chat area ───────────────────────────────────────────── -->
+  <div id="chat-area" class="chat-area">
+    <div id="messages" class="messages"></div>
+  </div>
+
+  <!-- ── Input area ──────────────────────────────────────────── -->
+  <div class="input-area">
+
+    <!-- File chips -->
+    <div id="file-chips-area" class="file-chips-area hidden">
+      <div id="file-chips" class="file-chips"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button id="btn-page-context" class="toolbar-btn" title="Toggle page context">
+        <span class="tbi">&#9634;</span><span id="page-ctx-lbl">Page</span>
+      </button>
+      <button id="btn-attach-file" class="toolbar-btn" title="Attach file (.txt .md .pdf .csv)">
+        <span class="tbi">&#128206;</span>
+      </button>
+      <button id="btn-templates-open" class="toolbar-btn" title="Prompt templates">
+        <span class="tbi">/</span>
+      </button>
+      <div class="tb-spacer"></div>
+      <button id="btn-clear" class="toolbar-btn" title="Clear conversation">
+        <span class="tbi">&#10005;</span> Clear
+      </button>
+    </div>
+
+    <!-- Message input -->
+    <textarea id="input-message"
+      placeholder="Type a message… (Enter to send, Shift+Enter for newline, / for templates)"
+      rows="3"
+      spellcheck="true"></textarea>
+
+    <!-- Template autocomplete dropdown (shown when / is typed) -->
+    <div id="template-dropdown" class="tmpl-dropdown hidden">
+      <div class="tmpl-dd-header">
+        Templates
+        <button id="btn-tmpl-manage-inline" class="pill-btn">Manage</button>
+      </div>
+      <div id="tmpl-dd-list" class="tmpl-dd-list"></div>
+    </div>
+
+    <!-- Send row -->
+    <div class="send-row">
+      <button id="btn-stop" class="stop-btn hidden" title="Stop generation">&#9632;</button>
+      <span id="model-display" class="model-display" title="Active model"></span>
+      <button id="btn-send" class="send-btn" title="Send (Enter)">&#9658;</button>
+    </div>
+
+  </div><!-- /input-area -->
+
+  <!-- ── Template manager overlay ───────────────────────────── -->
+  <div id="tmpl-overlay" class="overlay hidden">
+    <div class="overlay-panel">
+      <div class="overlay-hdr">
+        <span>Prompt Templates</span>
+        <button id="btn-tmpl-overlay-close" class="icon-btn">&#10005;</button>
+      </div>
+      <div id="tmpl-list" class="tmpl-list"></div>
+      <div class="tmpl-add-form">
+        <input  id="tmpl-new-name"    type="text"  placeholder="Template name…" maxlength="60">
+        <textarea id="tmpl-new-content" placeholder="Template content…" rows="4"></textarea>
+        <button id="btn-tmpl-add" class="primary-btn">Add Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
+  <input type="file" id="file-input" accept=".txt,.md,.pdf,.csv" multiple hidden>
+
+</div><!-- /#app -->
+<!-- Markdown renderer -->
+<script src="marked.min.js"></script>
+<script src="highlight.min.js"></script>
+<script src="sidepanel.js"></script>
+</body>
+</html>
