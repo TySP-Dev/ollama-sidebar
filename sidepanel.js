@@ -888,13 +888,13 @@ function fetchModels() {
           var e = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'No response';
           setStatus('error', humanizeError(e));
           dbg('ERROR', 'fetchModels failed', { error: e });
-          resolve(); return;
+          resolve(false); return;
         }
         if (!response.ok) {
           var msg = humanizeError(response.error || ('HTTP ' + response.status));
           setStatus('error', msg);
           dbg('ERROR', 'fetchModels failed', { error: msg });
-          resolve(); return;
+          resolve(false); return;
         }
         var raw = response.data.models || [];
         S.models = raw.map(function (m) {
@@ -906,7 +906,7 @@ function fetchModels() {
         });
         setStatus('connected', 'Connected');
         dbg('MODEL', 'models fetched', { count: S.models.length, models: S.models.map(function(m){ return m.name; }) });
-        resolve();
+        resolve(true);
       }
     );
   });
@@ -1311,12 +1311,17 @@ function updateSessionBar() {
 
 function populateModelSelect() {
   var current = (S.activeSession && S.activeSession.model) || '';
-  modelSelect.innerHTML = '';
+
   if (!S.models.length) {
-    var opt = document.createElement('option');
-    opt.value = ''; opt.textContent = '(no model)';
-    modelSelect.appendChild(opt);
+    if (!modelSelect.options.length) {
+      var opt = document.createElement('option');
+      opt.value = ''; opt.textContent = '(no model)';
+      modelSelect.appendChild(opt);
+    }
+    return;
   }
+
+  modelSelect.innerHTML = '';
   S.models.forEach(function(m) {
     var opt = document.createElement('option');
     opt.value = m.name;
@@ -2443,8 +2448,8 @@ loadAllData(async function () {
   });
   renderSession();
   initEventHandlers();
-  await fetchModels();
-  populateModels();
+  var ok = await fetchModels();
+  if (ok) populateModels();
 });
 
 chrome.storage.onChanged.addListener(function (changes, area) {
@@ -2467,7 +2472,7 @@ chrome.storage.onChanged.addListener(function (changes, area) {
     var btnCompact = document.getElementById('btn-compact');
     if (btnCompact) btnCompact.classList.toggle('active', S.compact);
   }
-  if (reconnect) fetchModels().then(populateModels);
+  if (reconnect) fetchModels().then(function (ok) { if (ok) populateModels(); });
 });
 
 })();
