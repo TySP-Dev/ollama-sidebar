@@ -38,10 +38,13 @@ A browser sidebar chat extension that connects to a self-hosted Ollama instance.
 1. Click the ⚙ Settings button in the sidebar header
 2. Set your **Ollama Base URL** (default: `http://localhost:11434`)
 3. Click **Test Connection** — connected models will appear in the dropdowns
-4. Set a **Default Chat Model**
+4. Set a **Chat Title Model**
+5. Set a **Default Chat Model**
+6. (OPTIONAL) Set a **Embedded model**
 5. Click **Save Settings**
 
-If Ollama is behind a reverse proxy with bearer token auth, enter the token in the **Bearer Token** field.
+> [!NOTE]
+> If Ollama is behind a reverse proxy with bearer token auth, enter the token in the **Bearer Token** field.
 
 ---
 
@@ -50,9 +53,8 @@ If Ollama is behind a reverse proxy with bearer token auth, enter the token in t
 ### Chat
 
 - Streaming responses with stop, regenerate, and edit
-- Thinking/reasoning block support (collapsed by default)
+- Thinking/reasoning block support
 - Full markdown rendering with syntax-highlighted code blocks
-- Token metrics per response (tokens, tok/s, duration)
 
 ### Context
 
@@ -114,6 +116,10 @@ If Ollama is behind a reverse proxy with bearer token auth, enter the token in t
 ## Project structure
 
 ```
+├── .gitignore             # gitignore
+├── LICENSE.md             # MIT License
+├── README.md              # Readme file
+├── PrivacyPolicyForWebStore # Privacy Policy to publish to webstores
 ├── background.js          # Service worker — message routing, stream relay
 ├── content.js             # Content script — page text extraction
 ├── sidepanel.html         # Sidebar UI
