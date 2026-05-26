@@ -1,10 +1,10 @@
 <div align="center">
 
-[![Main Repo](https://img.shields.io/badge/Main%20Repo-gits.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/TySS-Dev/ollama-sidebar)
+[![Main Repo](https://img.shields.io/badge/Main%20Repo-git.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/TySS-Dev/ollama-sidebar)
 [![Mirror Repo](https://img.shields.io/badge/Mirror%20Repo-github.com-blue?logo=github)](https://github.com/TySP-Dev/ollama-sidebar)
 [![Chrome WebStore](https://img.shields.io/badge/Chrome%20WebStore%20(PENDING%20REVIEW)-Install%20Now-blue?logo=googlechrome)](https://chromewebstore.google.com/your-extension-link)
 
-<div align="left">
+</div>
 
 # Ollama Sidebar
 
@@ -48,8 +48,8 @@ A browser sidebar chat extension that connects to a self-hosted Ollama instance.
 3. Click **Test Connection** — connected models will appear in the dropdowns
 4. Set a **Chat Title Model**
 5. Set a **Default Chat Model**
-6. (OPTIONAL) Set a **Embedded model**
-5. Click **Save Settings**
+6. (OPTIONAL) Set an **Embedded model**
+7. Click **Save Settings**
 
 > [!NOTE]
 > If Ollama is behind a reverse proxy with bearer token auth, enter the token in the **Bearer Token** field.
