@@ -2,7 +2,7 @@
 
 [![Main Repo](https://img.shields.io/badge/Main%20Repo-gits.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/TySS-Dev/ollama-sidebar)
 [![Mirror Repo](https://img.shields.io/badge/Mirror%20Repo-github.com-blue?logo=github)](https://github.com/TySP-Dev/ollama-sidebar)
-[![Chrome WebStore](https://img.shields.io/badge/Chrome%20WebStore-Install%20Now-blue?logo=googlechrome)](https://chromewebstore.google.com/your-extension-link)
+[![Chrome WebStore (PENDING REVIEW)](https://img.shields.io/badge/Chrome%20WebStore-Install%20Now-blue?logo=googlechrome)](https://chromewebstore.google.com/your-extension-link)
 
 <div align="left">
 
